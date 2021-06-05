@@ -116,11 +116,38 @@ impl WidgetGallery {
         ui.checkbox(boolean, "Checkbox");
         ui.end_row();
 
+        ui.label("");
+        ui.add(egui::Checkbox::new(boolean, "Label on left").label_on_left(true));
+        ui.end_row();
+
         ui.add(doc_link_label("RadioButton", "radio"));
         ui.horizontal(|ui| {
             ui.radio_value(radio, Enum::First, "First");
             ui.radio_value(radio, Enum::Second, "Second");
             ui.radio_value(radio, Enum::Third, "Third");
+        });
+        ui.end_row();
+
+        ui.label("");
+        ui.horizontal(|ui| {
+            if ui
+                .add(egui::RadioButton::new(*radio == Enum::First, "First").label_on_left(true))
+                .clicked()
+            {
+                *radio = Enum::First
+            };
+            if ui
+                .add(egui::RadioButton::new(*radio == Enum::Second, "Second").label_on_left(true))
+                .clicked()
+            {
+                *radio = Enum::Second
+            };
+            if ui
+                .add(egui::RadioButton::new(*radio == Enum::Third, "Third").label_on_left(true))
+                .clicked()
+            {
+                *radio = Enum::Third
+            };
         });
         ui.end_row();
 

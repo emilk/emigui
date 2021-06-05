@@ -214,6 +214,7 @@ pub struct Checkbox<'a> {
     text: String,
     text_color: Option<Color32>,
     text_style: Option<TextStyle>,
+    left_sided: bool,
 }
 
 impl<'a> Checkbox<'a> {
@@ -224,6 +225,7 @@ impl<'a> Checkbox<'a> {
             text: text.to_string(),
             text_color: None,
             text_style: None,
+            left_sided: false,
         }
     }
 
@@ -236,6 +238,12 @@ impl<'a> Checkbox<'a> {
         self.text_style = Some(text_style);
         self
     }
+
+    /// If set to `true` the label will be displayed before the checkbox
+    pub fn label_on_left(mut self, is_on_left: bool) -> Self {
+        self.left_sided = is_on_left;
+        self
+    }
 }
 
 impl<'a> Widget for Checkbox<'a> {
@@ -245,6 +253,7 @@ impl<'a> Widget for Checkbox<'a> {
             text,
             text_color,
             text_style,
+            left_sided,
         } = self;
 
         let text_style = text_style
@@ -277,11 +286,23 @@ impl<'a> Widget for Checkbox<'a> {
 
         // let visuals = ui.style().interact_selectable(&response, *checked); // too colorful
         let visuals = ui.style().interact(&response);
-        let text_pos = pos2(
-            rect.min.x + button_padding.x + icon_width + icon_spacing,
-            rect.center().y - 0.5 * galley.size.y,
-        );
-        let (small_icon_rect, big_icon_rect) = ui.spacing().icon_rectangles(rect);
+        let text_pos = if left_sided {
+            pos2(rect.min.x, rect.center().y - 0.5 * galley.size.y)
+        } else {
+            pos2(
+                rect.min.x + button_padding.x + icon_width + icon_spacing,
+                rect.center().y - 0.5 * galley.size.y,
+            )
+        };
+
+        let text_size = galley.size.x;
+
+        let (mut small_icon_rect, mut big_icon_rect) = ui.spacing().icon_rectangles(rect);
+        if left_sided {
+            small_icon_rect = small_icon_rect.translate(vec2(text_size + button_padding.x, 0.));
+            big_icon_rect = big_icon_rect.translate(vec2(text_size + button_padding.x, 0.));
+        }
+
         ui.painter().add(Shape::Rect {
             rect: big_icon_rect.expand(visuals.expansion),
             corner_radius: visuals.corner_radius,
@@ -336,6 +357,7 @@ pub struct RadioButton {
     text: String,
     text_color: Option<Color32>,
     text_style: Option<TextStyle>,
+    left_sided: bool,
 }
 
 impl RadioButton {
@@ -346,6 +368,7 @@ impl RadioButton {
             text: text.to_string(),
             text_color: None,
             text_style: None,
+            left_sided: false,
         }
     }
 
@@ -358,6 +381,12 @@ impl RadioButton {
         self.text_style = Some(text_style);
         self
     }
+
+    /// If set to `true` the label will be displayed before the checkbox
+    pub fn label_on_left(mut self, is_on_left: bool) -> Self {
+        self.left_sided = is_on_left;
+        self
+    }
 }
 
 impl Widget for RadioButton {
@@ -367,6 +396,7 @@ impl Widget for RadioButton {
             text,
             text_color,
             text_style,
+            left_sided,
         } = self;
 
         let text_style = text_style
@@ -384,6 +414,7 @@ impl Widget for RadioButton {
         } else {
             ui.fonts().layout_no_wrap(text_style, text)
         };
+        let text_size = galley.size.x;
 
         let mut desired_size = total_extra + galley.size;
         desired_size = desired_size.at_least(ui.spacing().interact_size);
@@ -392,15 +423,23 @@ impl Widget for RadioButton {
         response
             .widget_info(|| WidgetInfo::selected(WidgetType::RadioButton, checked, &galley.text));
 
-        let text_pos = pos2(
-            rect.min.x + button_padding.x + icon_width + icon_spacing,
-            rect.center().y - 0.5 * galley.size.y,
-        );
+        let text_pos = if left_sided {
+            pos2(rect.min.x, rect.center().y - 0.5 * galley.size.y)
+        } else {
+            pos2(
+                rect.min.x + button_padding.x + icon_width + icon_spacing,
+                rect.center().y - 0.5 * galley.size.y,
+            )
+        };
 
         // let visuals = ui.style().interact_selectable(&response, checked); // too colorful
         let visuals = ui.style().interact(&response);
 
-        let (small_icon_rect, big_icon_rect) = ui.spacing().icon_rectangles(rect);
+        let (mut small_icon_rect, mut big_icon_rect) = ui.spacing().icon_rectangles(rect);
+        if left_sided {
+            small_icon_rect = small_icon_rect.translate(vec2(text_size + button_padding.x, 0.));
+            big_icon_rect = big_icon_rect.translate(vec2(text_size + button_padding.x, 0.));
+        }
 
         let painter = ui.painter();
 
