@@ -1,5 +1,5 @@
 use super::Demo;
-use egui::{CtxRef, ScrollArea, Ui};
+use egui::{localization::Language, CtxRef, ScrollArea, Ui};
 use std::collections::BTreeSet;
 
 // ----------------------------------------------------------------------------
@@ -11,6 +11,8 @@ struct Demos {
     demos: Vec<Box<dyn Demo>>,
 
     open: BTreeSet<String>,
+
+    lang: Language,
 }
 
 impl Default for Demos {
@@ -40,12 +42,13 @@ impl Demos {
                 .name()
                 .to_owned(),
         );
+        let lang = Language::English;
 
-        Self { demos, open }
+        Self { demos, open, lang }
     }
 
     pub fn checkboxes(&mut self, ui: &mut Ui) {
-        let Self { demos, open } = self;
+        let Self { demos, open, .. } = self;
         for demo in demos {
             let mut is_open = open.contains(demo.name());
             ui.checkbox(&mut is_open, demo.name());
@@ -54,7 +57,7 @@ impl Demos {
     }
 
     pub fn windows(&mut self, ctx: &CtxRef) {
-        let Self { demos, open } = self;
+        let Self { demos, open, .. } = self;
         for demo in demos {
             let mut is_open = open.contains(demo.name());
             demo.show(ctx, &mut is_open);
@@ -139,13 +142,14 @@ fn set_open(open: &mut BTreeSet<String>, key: &'static str, is_open: bool) {
 pub struct DemoWindows {
     demos: Demos,
     tests: Tests,
+    lang: Language,
 }
 
 impl DemoWindows {
     /// Show the app ui (menu bar and windows).
     /// `sidebar_ui` can be used to optionally show some things in the sidebar
     pub fn ui(&mut self, ctx: &CtxRef) {
-        let Self { demos, tests } = self;
+        let Self { demos, tests, lang } = self;
 
         egui::SidePanel::right("egui_demo_panel")
             .min_width(150.0)
@@ -186,6 +190,24 @@ impl DemoWindows {
                             ui.ctx().memory().reset_areas();
                         }
                     });
+
+                    ui.separator();
+
+                    let lang_text = ctx.localization().lang_text;
+                    let previous_lang = lang.clone();
+
+                    egui::ComboBox::from_label(lang_text)
+                        .selected_text(format!("{:?}", lang))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(lang, Language::English, "English");
+                            ui.selectable_value(lang, Language::BahasaMalaysia, "BahasaMalaysia");
+                        });
+
+                    let current_lang = lang.clone();
+
+                    if previous_lang != current_lang {
+                        ctx.set_localization(current_lang);
+                    }
                 });
             });
 
@@ -210,7 +232,7 @@ impl DemoWindows {
 
     /// Show the open windows.
     fn windows(&mut self, ctx: &CtxRef) {
-        let Self { demos, tests } = self;
+        let Self { demos, tests, .. } = self;
 
         demos.windows(ctx);
         tests.windows(ctx);

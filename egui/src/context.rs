@@ -11,6 +11,7 @@ use crate::{
     frame_state::FrameState,
     input_state::*,
     layers::GraphicLayers,
+    localization::{Language, Localization},
     mutex::{Mutex, MutexGuard},
     *,
 };
@@ -326,6 +327,7 @@ pub struct Context {
     fonts: Option<Arc<Fonts>>,
     memory: Arc<Mutex<Memory>>,
     animation_manager: Arc<Mutex<AnimationManager>>,
+    localization: Arc<Mutex<Localization>>,
 
     input: InputState,
 
@@ -354,6 +356,7 @@ impl Clone for Context {
             output: self.output.clone(),
             paint_stats: self.paint_stats.clone(),
             repaint_requests: self.repaint_requests.load(SeqCst).into(),
+            localization: self.localization.clone(),
         }
     }
 }
@@ -559,9 +562,11 @@ impl Context {
             input.pixels_per_point = new_pixels_per_point;
         }
 
+        let lang = self.memory().new_language.take().unwrap_or_default();
+        self.set_localization(lang);
+
         self.input = input.begin_frame(new_raw_input);
         self.frame_state.lock().begin_frame(&self.input);
-
         {
             // Load new fonts if required:
             let new_font_definitions = self.memory().new_font_definitions.take();
@@ -948,5 +953,27 @@ impl Context {
         let mut style: Style = (*self.style()).clone();
         style.ui(ui);
         self.set_style(style);
+    }
+}
+
+/// ## Localization
+impl Context {
+    /// Sets the current language of the default texts within [`crate::widgets`] and [`crate::containers`].
+    ///
+    /// The languages available for localization can be seen in [`crate::localization::Language`].
+    pub fn set_localization(&self, lang: Language) {
+        self.localization().set_localization(lang.clone());
+        self.memory().new_language = Some(lang);
+    }
+
+    /// Use this to access the `Localization` struct stored within context and also all the texts stored within it.
+    pub fn localization(&self) -> MutexGuard<'_, Localization> {
+        self.localization.lock()
+    }
+
+    /// Returns the language that will be set in the next frame
+    pub fn lang(&self) -> Language {
+        let new_lang = self.memory().new_language.clone().unwrap_or_default();
+        new_lang
     }
 }
