@@ -7,8 +7,8 @@ mod transform;
 use std::collections::HashSet;
 
 use items::PlotItem;
+pub use items::{Bar, BarChart, Boxplot, BoxplotSeries, Line, MarkerShape, Points, Value, Values};
 pub use items::{HLine, VLine};
-pub use items::{Line, MarkerShape, Points, Value, Values};
 use legend::LegendWidget;
 pub use legend::{Corner, Legend};
 use transform::{Bounds, ScreenTransform};
@@ -139,6 +139,36 @@ impl Plot {
         }
         self.items.push(Box::new(points));
 
+        self
+    }
+
+    /// Add a series of boxplots.
+    /// You can add multiple such series.
+    pub fn boxplots(mut self, mut boxplots: BoxplotSeries) -> Self {
+        if boxplots.plots.is_empty() {
+            return self;
+        }
+
+        // Give the elements an automatic color if no color has been assigned.
+        if boxplots.default_color == Color32::TRANSPARENT {
+            boxplots = boxplots.color(self.auto_color());
+        }
+        self.items.push(Box::new(boxplots));
+
+        self
+    }
+
+    /// Add a bar chart.
+    /// You can add multiple such charts.
+    pub fn barchart(mut self, mut chart: BarChart) -> Self {
+        if chart.bars.is_empty() {
+            return self;
+        }
+        // Give the elements an automatic color if no color has been assigned.
+        if chart.default_color == Color32::TRANSPARENT {
+            chart = chart.color(self.auto_color());
+        }
+        self.items.push(Box::new(chart));
         self
     }
 
@@ -385,7 +415,7 @@ impl Widget for Plot {
             vlines.iter().for_each(|line| bounds.extend_with_x(line.x));
             items
                 .iter()
-                .for_each(|item| bounds.merge(&item.series().get_bounds()));
+                .for_each(|item| bounds.merge(&item.get_bounds()));
             bounds.add_relative_margin(margin_fraction);
         }
         // Make sure they are not empty.
@@ -628,85 +658,22 @@ impl Prepared {
         }
 
         let interact_radius: f32 = 16.0;
-        let mut closest_value = None;
         let mut closest_item = None;
         let mut closest_dist_sq = interact_radius.powi(2);
         for item in items {
-            for value in &item.series().values {
-                let pos = transform.position_from_value(value);
-                let dist_sq = pointer.distance_sq(pos);
-                if dist_sq < closest_dist_sq {
-                    closest_dist_sq = dist_sq;
-                    closest_value = Some(value);
-                    closest_item = Some(item.name());
+            if let Some(closest) = item.closest(ui, pointer, transform, *show_x, *show_y) {
+                if closest.distance_square < closest_dist_sq {
+                    closest_dist_sq = closest.distance_square;
+                    closest_item = Some(closest);
                 }
             }
         }
 
-        let mut prefix = String::new();
-        if let Some(name) = closest_item {
-            if !name.is_empty() {
-                prefix = format!("{}\n", name);
-            }
-        }
-
-        let line_color = if ui.visuals().dark_mode {
-            Color32::from_gray(100).additive()
+        if let Some(ref mut closest) = closest_item {
+            (closest.hover_shapes)(shapes);
         } else {
-            Color32::from_black_alpha(180)
-        };
-
-        let value = if let Some(value) = closest_value {
-            let position = transform.position_from_value(value);
-            shapes.push(Shape::circle_filled(position, 3.0, line_color));
-            *value
-        } else {
-            transform.value_from_position(pointer)
-        };
-        let pointer = transform.position_from_value(&value);
-
-        let rect = transform.frame();
-
-        if *show_x {
-            // vertical line
-            shapes.push(Shape::line_segment(
-                [pos2(pointer.x, rect.top()), pos2(pointer.x, rect.bottom())],
-                (1.0, line_color),
-            ));
+            let value = transform.value_from_position(pointer);
+            items::rulers_at_value(ui, pointer, transform, *show_x, *show_y, value, "", shapes);
         }
-        if *show_y {
-            // horizontal line
-            shapes.push(Shape::line_segment(
-                [pos2(rect.left(), pointer.y), pos2(rect.right(), pointer.y)],
-                (1.0, line_color),
-            ));
-        }
-
-        let text = {
-            let scale = transform.dvalue_dpos();
-            let x_decimals = ((-scale[0].abs().log10()).ceil().at_least(0.0) as usize).at_most(6);
-            let y_decimals = ((-scale[1].abs().log10()).ceil().at_least(0.0) as usize).at_most(6);
-            if *show_x && *show_y {
-                format!(
-                    "{}x = {:.*}\ny = {:.*}",
-                    prefix, x_decimals, value.x, y_decimals, value.y
-                )
-            } else if *show_x {
-                format!("{}x = {:.*}", prefix, x_decimals, value.x)
-            } else if *show_y {
-                format!("{}y = {:.*}", prefix, y_decimals, value.y)
-            } else {
-                unreachable!()
-            }
-        };
-
-        shapes.push(Shape::text(
-            ui.fonts(),
-            pointer + vec2(3.0, -2.0),
-            Align2::LEFT_BOTTOM,
-            text,
-            TextStyle::Body,
-            ui.visuals().text_color(),
-        ));
     }
 }

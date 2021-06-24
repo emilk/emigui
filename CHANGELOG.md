@@ -8,6 +8,7 @@ NOTE: [`eframe`](eframe/CHANGELOG.md), [`egui_web`](egui_web/CHANGELOG.md) and [
 ## Unreleased
 
 ### Added ⭐
+* [Add Bar Charts and Boxplots](https://github.com/emilk/egui/pull/499).
 * [Plot legend improvements](https://github.com/emilk/egui/pull/410).
 * [Line markers for plots](https://github.com/emilk/egui/pull/363).
 * Add right and bottom panels (`SidePanel::right` and `Panel::bottom`).

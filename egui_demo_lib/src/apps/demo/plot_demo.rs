@@ -1,5 +1,9 @@
 use egui::*;
-use plot::{Corner, Legend, Line, MarkerShape, Plot, Points, Value, Values};
+use plot::{
+    Bar, BarChart, Boxplot, BoxplotSeries, Corner, Legend, Line, MarkerShape, Plot, Points, Value,
+    Values,
+};
+
 use std::f64::consts::TAU;
 
 #[derive(PartialEq)]
@@ -270,16 +274,188 @@ impl Widget for &mut LegendDemo {
         ui.add(legend_plot)
     }
 }
+
+#[derive(PartialEq, Eq)]
+enum Chart {
+    GaussBars,
+    StackedBars,
+    Boxplots,
+}
+
+impl Default for Chart {
+    fn default() -> Self {
+        Self::GaussBars
+    }
+}
+
+#[derive(PartialEq)]
+struct ChartsDemo {
+    chart: Chart,
+    vertical: bool,
+}
+
+impl Default for ChartsDemo {
+    fn default() -> Self {
+        Self {
+            vertical: true,
+            chart: Chart::default(),
+        }
+    }
+}
+
+impl ChartsDemo {
+    fn gauss(&self, ui: &mut Ui) -> Response {
+        let mut chart = BarChart::new(
+            (-395..=395)
+                .step_by(10)
+                .map(|x| x as f64 * 0.01)
+                .map(|x| {
+                    (
+                        x,
+                        (-x * x / 2.0).exp() / (2.0 * std::f64::consts::PI).sqrt(),
+                    )
+                })
+                // The 10 factor here is purely for a nice 1:1 aspect ratio
+                .map(|(x, f)| Bar::new(x, f * 10.0).width(0.095))
+                .collect(),
+        )
+        .color(Color32::LIGHT_BLUE)
+        .name("Normal Distribution");
+        if !self.vertical {
+            chart = chart.horizontal();
+        }
+        let plot = Plot::new("Normal Distribution Demo")
+            .barchart(chart)
+            .legend(Legend::default())
+            .data_aspect(1.0);
+        ui.add(plot)
+    }
+
+    fn stacked(&self, ui: &mut Ui) -> Response {
+        let mut chart1 = BarChart::new(vec![
+            Bar::new(0.5, 1.0).name("Day 1"),
+            Bar::new(1.5, 3.0).name("Day 2"),
+            Bar::new(2.5, 1.0).name("Day 3"),
+            Bar::new(3.5, 2.0).name("Day 4"),
+            Bar::new(4.5, 4.0).name("Day 5"),
+        ])
+        .width(0.7)
+        .name("Set 1");
+        let mut chart2 = BarChart::new(vec![
+            Bar::new(0.5, 1.0),
+            Bar::new(1.5, 1.5),
+            Bar::new(2.5, 0.1),
+            Bar::new(3.5, 0.7),
+            Bar::new(4.5, 0.8),
+        ])
+        .width(0.7)
+        .name("Set 2")
+        .stack_on(&[&chart1]);
+        let mut chart3 = BarChart::new(vec![
+            Bar::new(0.5, -0.5),
+            Bar::new(1.5, 1.0),
+            Bar::new(2.5, 0.5),
+            Bar::new(3.5, -1.0),
+            Bar::new(4.5, 0.3),
+        ])
+        .width(0.7)
+        .name("Set 3")
+        .stack_on(&[&chart1, &chart2]);
+        let mut chart4 = BarChart::new(vec![
+            Bar::new(0.5, 0.5),
+            Bar::new(1.5, 1.0),
+            Bar::new(2.5, 0.5),
+            Bar::new(3.5, -0.5),
+            Bar::new(4.5, -0.5),
+        ])
+        .width(0.7)
+        .name("Set 4")
+        .stack_on(&[&chart1, &chart2, &chart3]);
+        if !self.vertical {
+            chart1 = chart1.horizontal();
+            chart2 = chart2.horizontal();
+            chart3 = chart3.horizontal();
+            chart4 = chart4.horizontal();
+        }
+        let plot = Plot::new("Stacked Bar Chart Demo")
+            .barchart(chart1)
+            .barchart(chart2)
+            .barchart(chart3)
+            .barchart(chart4)
+            .legend(Legend::default())
+            .data_aspect(1.0);
+        ui.add(plot)
+    }
+
+    fn boxplots(&self, ui: &mut Ui) -> Response {
+        let yellow = Color32::from_rgb(248, 252, 168);
+        let mut box1 = BoxplotSeries::new(vec![
+            Boxplot::new(0.5, 1.5, 2.2, 2.5, 2.6, 3.1).name("Day 1"),
+            Boxplot::new(2.5, 0.4, 1.0, 1.1, 1.4, 2.1).name("Day 2"),
+            Boxplot::new(4.5, 1.7, 2.0, 2.2, 2.5, 2.9).name("Day 3"),
+        ])
+        .name("Experiment A");
+        let mut box2 = BoxplotSeries::new(vec![
+            Boxplot::new(1.0, 0.2, 0.5, 1.0, 2.0, 2.7).name("Day 1"),
+            Boxplot::new(3.0, 1.5, 1.7, 2.1, 2.9, 3.3)
+                .name("Day 2: interesting")
+                .stroke(Stroke::new(1.5, yellow))
+                .fill(yellow.linear_multiply(0.2)),
+            Boxplot::new(5.0, 1.3, 2.0, 2.3, 2.9, 4.0).name("Day 3"),
+        ])
+        .name("Experiment B");
+        let mut box3 = BoxplotSeries::new(vec![
+            Boxplot::new(1.5, 2.1, 2.2, 2.6, 2.8, 3.0).name("Day 1"),
+            Boxplot::new(3.5, 1.3, 1.5, 1.9, 2.2, 2.4).name("Day 2"),
+            Boxplot::new(5.5, 0.2, 0.4, 1.0, 1.3, 1.5).name("Day 3"),
+        ])
+        .name("Experiment C");
+        if !self.vertical {
+            box1 = box1.horizontal();
+            box2 = box2.horizontal();
+            box3 = box3.horizontal();
+        }
+        let plot = Plot::new("Boxplots Demo")
+            .boxplots(box1)
+            .boxplots(box2)
+            .boxplots(box3)
+            .legend(Legend::default());
+        ui.add(plot)
+    }
+}
+
+impl Widget for &mut ChartsDemo {
+    fn ui(self, ui: &mut Ui) -> Response {
+        ui.label("Type:");
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.chart, Chart::GaussBars, "Histogram");
+            ui.selectable_value(&mut self.chart, Chart::StackedBars, "Stacked Bar Chart");
+            ui.selectable_value(&mut self.chart, Chart::Boxplots, "Boxplots");
+        });
+        ui.label("Orientation:");
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.vertical, true, "Vertical");
+            ui.selectable_value(&mut self.vertical, false, "Horizontal");
+        });
+        match self.chart {
+            Chart::GaussBars => self.gauss(ui),
+            Chart::StackedBars => self.stacked(ui),
+            Chart::Boxplots => self.boxplots(ui),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq)]
 enum Panel {
     Lines,
     Markers,
     Legend,
+    Charts,
 }
 
 impl Default for Panel {
     fn default() -> Self {
-        Self::Lines
+        Self::Charts
     }
 }
 
@@ -288,6 +464,7 @@ pub struct PlotDemo {
     line_demo: LineDemo,
     marker_demo: MarkerDemo,
     legend_demo: LegendDemo,
+    charts_demo: ChartsDemo,
     open_panel: Panel,
 }
 
@@ -326,6 +503,7 @@ impl super::View for PlotDemo {
             ui.selectable_value(&mut self.open_panel, Panel::Lines, "Lines");
             ui.selectable_value(&mut self.open_panel, Panel::Markers, "Markers");
             ui.selectable_value(&mut self.open_panel, Panel::Legend, "Legend");
+            ui.selectable_value(&mut self.open_panel, Panel::Charts, "Charts");
         });
         ui.separator();
 
@@ -338,6 +516,9 @@ impl super::View for PlotDemo {
             }
             Panel::Legend => {
                 ui.add(&mut self.legend_demo);
+            }
+            Panel::Charts => {
+                ui.add(&mut self.charts_demo);
             }
         }
     }

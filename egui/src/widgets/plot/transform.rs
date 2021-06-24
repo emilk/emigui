@@ -8,6 +8,7 @@ use crate::*;
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 pub(crate) struct Bounds {
+    /// [x, y] array
     pub min: [f64; 2],
     pub max: [f64; 2],
 }
@@ -201,6 +202,16 @@ impl ScreenTransform {
             self.bounds.min[1]..=self.bounds.max[1],
         );
         Value::new(x, y)
+    }
+
+    pub fn rect_from_values(&self, value1: &Value, value2: &Value) -> Rect {
+        let pos1 = self.position_from_value(value1);
+        let pos2 = self.position_from_value(value2);
+        // Note that the transform mirrors rects: top becomes bottom
+        let mut rect = Rect::NOTHING;
+        rect.extend_with(pos1);
+        rect.extend_with(pos2);
+        rect
     }
 
     /// delta position / delta value

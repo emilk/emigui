@@ -138,6 +138,25 @@ impl Pos2 {
         (self - other).length_sq()
     }
 
+    #[inline]
+    pub fn distance_from_rect_sq(self, rect: Rect) -> f32 {
+        let dx = if rect.min.x > self.x {
+            rect.min.x - self.x
+        } else if self.x > rect.max.x {
+            self.x - rect.max.x
+        } else {
+            0.0
+        };
+        let dy = if rect.min.y > self.y {
+            rect.min.y - self.y
+        } else if self.y > rect.max.y {
+            self.y - rect.max.y
+        } else {
+            0.0
+        };
+        dx * dx + dy * dy
+    }
+
     #[inline(always)]
     pub fn floor(self) -> Self {
         pos2(self.x.floor(), self.y.floor())
