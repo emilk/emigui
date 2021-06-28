@@ -174,27 +174,33 @@ impl super::View for ManualLayoutTest {
 // ----------------------------------------------------------------------------
 
 #[derive(PartialEq)]
-pub struct TableTest {
+pub struct GridTest {
     num_cols: usize,
     num_rows: usize,
     min_col_width: f32,
     max_col_width: f32,
+    with_header: bool,
+    with_column_stripes: bool,
+    with_row_stripes: bool,
 }
 
-impl Default for TableTest {
+impl Default for GridTest {
     fn default() -> Self {
         Self {
             num_cols: 4,
             num_rows: 4,
             min_col_width: 10.0,
             max_col_width: 200.0,
+            with_row_stripes: true,
+            with_column_stripes: false,
+            with_header: false,
         }
     }
 }
 
-impl super::Demo for TableTest {
+impl super::Demo for GridTest {
     fn name(&self) -> &'static str {
-        "Table Test"
+        "Grid Test"
     }
 
     fn show(&mut self, ctx: &egui::CtxRef, open: &mut bool) {
@@ -205,17 +211,30 @@ impl super::Demo for TableTest {
     }
 }
 
-impl super::View for TableTest {
+impl super::View for GridTest {
     fn ui(&mut self, ui: &mut egui::Ui) {
+        use egui::Rgba;
+
         ui.add(
             egui::Slider::new(&mut self.min_col_width, 0.0..=400.0).text("Minimum column width"),
         );
         ui.add(
             egui::Slider::new(&mut self.max_col_width, 0.0..=400.0).text("Maximum column width"),
         );
-        ui.add(egui::Slider::new(&mut self.num_cols, 0..=5).text("Columns"));
+        ui.add(egui::Slider::new(&mut self.num_cols, 0..=8).text("Columns"));
         ui.add(egui::Slider::new(&mut self.num_rows, 0..=20).text("Rows"));
 
+        ui.horizontal(|ui| {
+            ui.add(egui::Checkbox::new(
+                &mut self.with_row_stripes,
+                "Row stripes",
+            ));
+            ui.add(egui::Checkbox::new(&mut self.with_header, "Headers"));
+            ui.add(egui::Checkbox::new(
+                &mut self.with_column_stripes,
+                "Column stripes",
+            ));
+        });
         ui.separator();
 
         let words = [
@@ -223,29 +242,39 @@ impl super::View for TableTest {
             "with", "some", "more",
         ];
 
-        egui::Grid::new("my_grid")
-            .striped(true)
+        let mut grid = egui::Grid::new("my_grid")
+            .striped(self.with_row_stripes)
+            .header_row(self.with_header)
             .min_col_width(self.min_col_width)
-            .max_col_width(self.max_col_width)
-            .show(ui, |ui| {
-                for row in 0..self.num_rows {
-                    for col in 0..self.num_cols {
-                        if col == 0 {
-                            ui.label(format!("row {}", row));
-                        } else {
-                            let word_idx = row * 3 + col * 5;
-                            let word_count = (row * 5 + col * 75) % 13;
-                            let mut string = String::new();
-                            for word in words.iter().cycle().skip(word_idx).take(word_count) {
-                                string += word;
-                                string += " ";
-                            }
-                            ui.label(string);
-                        }
-                    }
-                    ui.end_row();
+            .max_col_width(self.max_col_width);
+        if self.with_column_stripes {
+            grid = grid.add_column_color(Box::new(|col| {
+                if col % 2 == 0 {
+                    Some(Rgba::from_rgba_premultiplied(0.01, 0.01, 0.01, 0.01).into())
+                } else {
+                    None
                 }
-            });
+            }));
+        }
+        grid.show(ui, |ui| {
+            for row in 0..self.num_rows {
+                for col in 0..self.num_cols {
+                    if col == 0 {
+                        ui.label(format!("row {}", row));
+                    } else {
+                        let word_idx = row * 3 + col * 5;
+                        let word_count = (row * 5 + col * 75) % 13;
+                        let mut string = String::new();
+                        for word in words.iter().cycle().skip(word_idx).take(word_count) {
+                            string += word;
+                            string += " ";
+                        }
+                        ui.label(string);
+                    }
+                }
+                ui.end_row();
+            }
+        });
 
         ui.vertical_centered(|ui| {
             egui::reset_button(ui, self);

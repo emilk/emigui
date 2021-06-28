@@ -78,11 +78,11 @@ impl Default for Tests {
     fn default() -> Self {
         Self::from_demos(vec![
             Box::new(super::tests::CursorTest::default()),
+            Box::new(super::tests::GridTest::default()),
             Box::new(super::tests::IdTest::default()),
             Box::new(super::tests::InputTest::default()),
             Box::new(super::layout_test::LayoutTest::default()),
             Box::new(super::tests::ManualLayoutTest::default()),
-            Box::new(super::tests::TableTest::default()),
         ])
     }
 }

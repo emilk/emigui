@@ -4,7 +4,7 @@ pub(crate) struct Placer {
     /// If set this will take precedence over [`layout`].
     grid: Option<grid::GridLayout>,
     layout: Layout,
-    region: Region,
+    pub(crate) region: Region,
 }
 
 impl Placer {

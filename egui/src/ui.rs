@@ -1596,7 +1596,8 @@ impl Ui {
         )
     }
 
-    pub(crate) fn set_grid(&mut self, grid: grid::GridLayout) {
+    pub(crate) fn set_grid(&mut self, mut grid: grid::GridLayout) {
+        grid.paint(self.placer.region.cursor.min, self.painter());
         self.placer.set_grid(grid);
     }
 

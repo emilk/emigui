@@ -32,6 +32,61 @@ impl State {
         self.col_widths.iter().sum::<f32>()
             + (self.col_widths.len().at_least(1) - 1) as f32 * x_spacing
     }
+
+    fn full_height(&self, y_spacing: f32) -> f32 {
+        self.row_heights.iter().sum::<f32>()
+            + (self.row_heights.len().at_least(1) - 1) as f32 * y_spacing
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+/// Either a single color, or a pair of colors corresponding to light/dark scheme
+#[derive(Clone, Copy)]
+pub enum GuiColor {
+    Single(Rgba),
+    LightDark { light: Rgba, dark: Rgba },
+}
+
+impl From<Rgba> for GuiColor {
+    fn from(color: Rgba) -> Self {
+        Self::Single(color)
+    }
+}
+
+impl GuiColor {
+    /// Create a single color
+    pub fn single(color: Rgba) -> Self {
+        Self::Single(color)
+    }
+
+    /// Create a light/dark scheme pair
+    pub fn light_dark(light: Rgba, dark: Rgba) -> Self {
+        Self::LightDark { light, dark }
+    }
+
+    /// Select a color appropriate to the referenced Style.
+    pub fn pick(&self, style: &Style) -> Rgba {
+        match &self {
+            Self::Single(color) => *color,
+            Self::LightDark { light, dark } => match style.visuals.dark_mode {
+                true => *dark,
+                false => *light,
+            },
+        }
+    }
+}
+
+/// Provided either a row or column number, return a color to paint for the background.
+/// Returning None means painting is skipped.
+pub type ColorPickerFn = Box<dyn Fn(usize) -> Option<GuiColor>>;
+
+/// Describe conditional colors for a grid.
+/// All predicates are evaluated for each row/col, and colors will be painted on top of each other.
+#[derive(Default)]
+pub(crate) struct ColorSpec {
+    pub row_pickers: Vec<ColorPickerFn>,
+    pub col_pickers: Vec<ColorPickerFn>,
 }
 
 // ----------------------------------------------------------------------------
@@ -49,7 +104,7 @@ pub(crate) struct GridLayout {
 
     spacing: Vec2,
 
-    striped: bool,
+    color_spec: ColorSpec,
     initial_x: f32,
     min_cell_size: Vec2,
     max_cell_size: Vec2,
@@ -77,7 +132,7 @@ impl GridLayout {
             prev_state,
             curr_state: State::default(),
             spacing: ui.spacing().item_spacing,
-            striped: false,
+            color_spec: Default::default(),
             initial_x,
             min_cell_size: ui.spacing().interact_size,
             max_cell_size: Vec2::INFINITY,
@@ -182,6 +237,80 @@ impl GridLayout {
         cursor.min.x += frame_rect.width() + self.spacing.x;
     }
 
+    /// Paint a row.
+    fn paint_row(&self, min: Pos2, color: GuiColor, painter: &Painter) {
+        let color = color.pick(&self.style);
+        if let Some(height) = self.prev_state.row_height(self.row) {
+            // Paint background for coming row:
+            let size = Vec2::new(self.prev_state.full_width(self.spacing.x), height);
+            let rect = Rect::from_min_size(min, size);
+            let mut rect = rect.expand2(Vec2::new(2.0, 0.0));
+            rect.max += Vec2::new(1.0, 0.5 * self.spacing.y + 1.5);
+
+            painter.rect_filled(rect, 2.0, color);
+        }
+    }
+
+    /// Paint a column.
+    ///
+    /// `col_widths`: The width of all the columns before the current column we wish to paint.
+    fn paint_column(
+        &self,
+        col: usize,
+        col_widths: f32,
+        min: Pos2,
+        color: GuiColor,
+        painter: &Painter,
+    ) {
+        let color = color.pick(&self.style);
+
+        // Paint a column:
+        // Offset from the cursor to paint the col at the right spot.
+        let min_offset = min
+            + Vec2::new(
+                // Sum up all the previous widths and add the padding
+                col_widths + (self.spacing.x + 1.0) * (col as f32 - 1.0),
+                -1.0,
+            );
+        let size = Vec2::new(
+            self.prev_col_width(col),
+            self.prev_state.full_height(self.spacing.y),
+        );
+        let size = size
+            + Vec2::new(
+                // Add padding
+                0.5 * self.spacing.x + 5.0,
+                3.0,
+            );
+
+        let rect = Rect::from_min_size(min_offset, size);
+
+        painter.rect_filled(rect, 2.0, color);
+    }
+
+    /// Paint the background for the next row & columns.
+    pub(crate) fn paint(&mut self, cursor_min: Pos2, painter: &Painter) {
+        for p in &self.color_spec.row_pickers {
+            if let Some(color) = p(self.row) {
+                self.paint_row(cursor_min, color, painter)
+            }
+        }
+        // Only paint columns when we're on the first row.
+        // They are painted for the entire grid.
+        if self.row == 0 {
+            for p in &self.color_spec.col_pickers {
+                // Iterate over columns
+                let mut col_widths = 0.0;
+                for col in 0..self.prev_state.col_widths.len() {
+                    if let Some(color) = p(col) {
+                        self.paint_column(col, col_widths, cursor_min, color, painter);
+                    }
+                    col_widths += self.prev_col_width(col);
+                }
+            }
+        }
+    }
+
     pub(crate) fn end_row(&mut self, cursor: &mut Rect, painter: &Painter) {
         let row_height = self.prev_row_height(self.row);
 
@@ -190,17 +319,7 @@ impl GridLayout {
         self.col = 0;
         self.row += 1;
 
-        if self.striped && self.row % 2 == 1 {
-            if let Some(height) = self.prev_state.row_height(self.row) {
-                // Paint background for coming row:
-                let size = Vec2::new(self.prev_state.full_width(self.spacing.x), height);
-                let rect = Rect::from_min_size(cursor.min, size);
-                let rect = rect.expand2(0.5 * self.spacing.y * Vec2::Y);
-                let rect = rect.expand2(2.0 * Vec2::X); // HACK: just looks better with some spacing on the sides
-
-                painter.rect_filled(rect, 2.0, self.style.visuals.faint_bg_color);
-            }
-        }
+        self.paint(cursor.min, painter);
     }
 
     pub(crate) fn save(&self) {
@@ -244,11 +363,13 @@ impl GridLayout {
 #[must_use = "You should call .show()"]
 pub struct Grid {
     id_source: Id,
-    striped: bool,
+    row_stripes: bool,
+    header_row: bool,
     min_col_width: Option<f32>,
     min_row_height: Option<f32>,
     max_cell_size: Vec2,
     spacing: Option<Vec2>,
+    color_spec: ColorSpec,
     start_row: usize,
 }
 
@@ -257,21 +378,42 @@ impl Grid {
     pub fn new(id_source: impl std::hash::Hash) -> Self {
         Self {
             id_source: Id::new(id_source),
-            striped: false,
+            row_stripes: false,
+            header_row: false,
             min_col_width: None,
             min_row_height: None,
             max_cell_size: Vec2::INFINITY,
             spacing: None,
+            color_spec: Default::default(),
             start_row: 0,
         }
+    }
+
+    /// Add a `ColorPickerFn` to the color spec without overwriting existing column colors.
+    pub fn add_column_color(mut self, predicate: ColorPickerFn) -> Self {
+        self.color_spec.col_pickers.push(predicate);
+        self
+    }
+
+    /// Add a `ColorPickerFn` to the color spec without overwriting existing row colors.
+    pub fn add_row_color(mut self, predicate: ColorPickerFn) -> Self {
+        self.color_spec.row_pickers.push(predicate);
+        self
     }
 
     /// If `true`, add a subtle background color to every other row.
     ///
     /// This can make a table easier to read.
     /// Default: `false`.
-    pub fn striped(mut self, striped: bool) -> Self {
-        self.striped = striped;
+    pub fn striped(mut self, row_stripes: bool) -> Self {
+        self.row_stripes = row_stripes;
+        self
+    }
+
+    /// If `true`, adds a contrasting color to the first row.
+    /// Default: `false`.
+    pub fn header_row(mut self, header_row: bool) -> Self {
+        self.header_row = header_row;
         self
     }
 
@@ -314,11 +456,13 @@ impl Grid {
     pub fn show<R>(self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
         let Self {
             id_source,
-            striped,
+            row_stripes,
+            header_row,
             min_col_width,
             min_row_height,
             max_cell_size,
             spacing,
+            color_spec,
             start_row,
         } = self;
         let min_col_width = min_col_width.unwrap_or_else(|| ui.spacing().interact_size.x);
@@ -331,14 +475,43 @@ impl Grid {
         // which we do here:
         ui.horizontal(|ui| {
             let id = ui.make_persistent_id(id_source);
-            let grid = GridLayout {
-                striped,
+            let mut grid = GridLayout {
                 spacing,
                 min_cell_size: vec2(min_col_width, min_row_height),
                 max_cell_size,
+                color_spec,
                 row: start_row,
                 ..GridLayout::new(ui, id)
             };
+
+            // Set convenience color specs
+            if row_stripes {
+                grid.color_spec.row_pickers.push(Box::new(move |row| {
+                    if row % 2 == 0 {
+                        Some(GuiColor::light_dark(
+                            Rgba::from_black_alpha(0.075),
+                            Rgba::from_white_alpha(0.0075),
+                        ))
+                    } else {
+                        None
+                    }
+                }));
+            }
+
+            if header_row {
+                grid.color_spec.row_pickers.push(Box::new(|row| {
+                    if row == 0 {
+                        Some(GuiColor::light_dark(
+                            Rgba::from_black_alpha(0.75),
+                            Rgba::from_white_alpha(0.075),
+                        ))
+                    } else {
+                        None
+                    }
+                }));
+            }
+
+            // ---
 
             ui.set_grid(grid);
             let r = add_contents(ui);
