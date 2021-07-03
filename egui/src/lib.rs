@@ -341,6 +341,7 @@ pub mod style;
 mod ui;
 pub mod util;
 pub mod widgets;
+pub mod context_menu;
 
 pub use epaint;
 pub use epaint::emath;
