@@ -27,20 +27,23 @@ impl ContextMenuSystem {
         if let Some(pos) = pointer.interact_pos() {
             if pointer.any_pressed() {
                 let mut destroy = false;
+                let mut in_old_menu = false;
                 if let Some(context_menu) = &mut self.context_menu {
-                    let in_old_menu = context_menu.area_contains(pos);
-                    destroy = !in_old_menu && context_menu.ui_id == ui.id();
+                    in_old_menu = context_menu.area_contains(pos);
+                    destroy = context_menu.ui_id == ui.id();
                 }
                 let in_ui = ui.rect_contains_pointer(ui.max_rect_finite());
-                if in_ui {
-                    if pointer.button_down(PointerButton::Secondary) {
-                        // todo: adapt to context
-                        return MenuResponse::Create(pos);
-                    } else {
+                if !in_old_menu {
+                    if in_ui {
+                        if pointer.button_down(PointerButton::Secondary) {
+                            // todo: adapt to context
+                            return MenuResponse::Create(pos);
+                        } else {
+                            return MenuResponse::Close;
+                        }
+                    } else if destroy {
                         return MenuResponse::Close;
                     }
-                } else if destroy {
-                    return MenuResponse::Close;
                 }
             }
         }
@@ -48,8 +51,12 @@ impl ContextMenuSystem {
     }
     pub fn ui_context_menu(&mut self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
         match self.response(ui, add_contents) {
-            MenuResponse::Create(pos) => self.context_menu = Some(ContextMenuRoot::new(pos, ui.id())),
-            MenuResponse::Close => self.context_menu = None,
+            MenuResponse::Create(pos) => {
+                self.context_menu = Some(ContextMenuRoot::new(pos, ui.id()));
+            },
+            MenuResponse::Close => {
+                self.context_menu = None
+            },
             MenuResponse::Stay => {}
         }
     }
