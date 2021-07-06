@@ -121,7 +121,7 @@ impl ContextMenu {
     fn show_impl(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui)) -> Response {
         Area::new(format!("context_menu_{:#?}", self.position))
             .order(Order::Foreground)
-            .fixed_pos(self.position.to_vec2())
+            .fixed_pos(self.position)
             .interactable(true)
             .show(ctx, |ui| {
                 Frame::none()
