@@ -78,7 +78,7 @@ pub fn drop_target<R>(
 
 pub struct DragAndDropDemo {
     /// columns with items
-    columns: Vec<Vec<&'static str>>,
+    columns: Vec<Vec<String>>,
 }
 
 impl Default for DragAndDropDemo {
@@ -88,7 +88,9 @@ impl Default for DragAndDropDemo {
                 vec!["Item A", "Item B", "Item C"],
                 vec!["Item D", "Item E"],
                 vec!["Item F", "Item G", "Item H"],
-            ],
+            ].into_iter()
+            .map(|v| v.into_iter().map(ToString::to_string).collect())
+            .collect(),
         }
     }
 }
@@ -116,15 +118,19 @@ impl super::View for DragAndDropDemo {
 
         let mut source_col_row = None;
         let mut drop_col = None;
-
         ui.columns(self.columns.len(), |uis| {
-            for (col_idx, column) in self.columns.iter().enumerate() {
+            uis[0].context_menu(|ui, menu_state| {
+                if ui.button("New Item...").clicked() {
+                    self.columns[0].push("New Item".to_string());
+                    menu_state.close();
+                }
+            });
+            for (col_idx, column) in self.columns.clone().into_iter().enumerate() {
                 let ui = &mut uis[col_idx];
                 let can_accept_what_is_being_dragged = true; // We accept anything being dragged (for now) ¯\_(ツ)_/¯
                 let response = drop_target(ui, can_accept_what_is_being_dragged, |ui| {
                     ui.set_min_size(vec2(64.0, 100.0));
-
-                    for (row_idx, &item) in column.iter().enumerate() {
+                    for (row_idx, item) in column.iter().enumerate() {
                         let item_id = Id::new("item").with(col_idx).with(row_idx);
                         drag_source(ui, item_id, |ui| {
                             ui.label(item);

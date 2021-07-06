@@ -4,6 +4,7 @@ use std::hash::Hash;
 
 use crate::{
     color::*, containers::*, epaint::text::Fonts, layout::*, mutex::MutexGuard, placer::Placer,
+    context_menu::MenuState,
     widgets::*, *,
 };
 
@@ -324,6 +325,10 @@ impl Ui {
     /// This is used, for instance, to avoid painting outside a window that is smaller than its contents.
     pub fn set_clip_rect(&mut self, clip_rect: Rect) {
         self.painter.set_clip_rect(clip_rect);
+    }
+
+    pub fn context_menu(&mut self, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
+        self.ctx().clone().show_ui_context_menu(self, add_contents)
     }
 }
 

@@ -8,60 +8,98 @@ use super::{
 };
 
 #[derive(Default, Clone)]
-#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "persistence", serde(default))]
 pub struct ContextMenuSystem {
-    context_menu: Option<ContextMenu>,
+    context_menu: Option<ContextMenuRoot>,
 }
 impl ContextMenuSystem {
-    pub fn listen(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
-        let pointer = &ctx.input().pointer;
-        if let Some(pos) = pointer.interact_pos() {
-            let mut destroy = false;
-            let mut reset = true;
-            if let Some(context_menu) = &mut self.context_menu {
-                let response = context_menu.show_root(ctx, add_contents);
-                context_menu.state.rect = response.rect;
+    fn response(&mut self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> MenuResponse {
+        if let Some(context_menu) = &mut self.context_menu {
+            if context_menu.ui_id == ui.id() {
+                let response = context_menu.show(ui.ctx(), add_contents);
+                context_menu.rect = response.rect;
 
-                if context_menu.state.response.is_close() {
-                    destroy = true;
-                }
-                if !pointer.any_pressed() || context_menu.area_contains(pos) {
-                    reset = false;
+                if context_menu.response.is_close() {
+                    return MenuResponse::Close;
                 }
             }
-            if reset && pointer.button_down(PointerButton::Secondary) {
-                // todo: adapt to context
-                self.context_menu = Some(ContextMenu::new(pos));
-            } else if destroy || (reset && pointer.button_down(PointerButton::Primary))  {
-                self.context_menu = None;
+        }
+        let pointer = &ui.input().pointer;
+        if let Some(pos) = pointer.interact_pos() {
+            if pointer.any_pressed() {
+                let mut destroy = false;
+                if let Some(context_menu) = &mut self.context_menu {
+                    let in_old_menu = context_menu.area_contains(pos);
+                    destroy = !in_old_menu && context_menu.ui_id == ui.id();
+                }
+                let in_ui = ui.rect_contains_pointer(ui.max_rect_finite());
+                if in_ui {
+                    if pointer.button_down(PointerButton::Secondary) {
+                        // todo: adapt to context
+                        return MenuResponse::Create(pos);
+                    } else {
+                        return MenuResponse::Close;
+                    }
+                } else if destroy {
+                    return MenuResponse::Close;
+                }
             }
+        }
+        MenuResponse::Stay
+    }
+    pub fn ui_context_menu(&mut self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
+        match self.response(ui, add_contents) {
+            MenuResponse::Create(pos) => self.context_menu = Some(ContextMenuRoot::new(pos, ui.id())),
+            MenuResponse::Close => self.context_menu = None,
+            MenuResponse::Stay => {}
         }
     }
 }
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 enum MenuResponse {
     Close,
     Stay,
+    Create(Pos2),
 }
 impl MenuResponse {
     pub fn is_close(&self) -> bool {
-        match self {
-            &Self::Close => true,
-            _ => false,
+        *self == Self::Close
+    }
+}
+#[derive(Clone)]
+struct ContextMenuRoot {
+    context_menu: ContextMenu,
+    ui_id: Id,
+}
+impl ContextMenuRoot {
+    pub fn new(position: Pos2, ui_id: Id) -> Self {
+        Self {
+            context_menu: ContextMenu::root(position),
+            ui_id,
         }
+    }
+    pub(crate) fn show(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
+        self.context_menu.show_root(ctx, add_contents)
+    }
+}
+impl std::ops::Deref for ContextMenuRoot {
+    type Target = MenuState;
+    fn deref(&self) -> &Self::Target {
+        &self.context_menu.state
+    }
+}
+impl std::ops::DerefMut for ContextMenuRoot {
+    fn deref_mut(&mut self) -> &mut <Self as std::ops::Deref>::Target {
+        &mut self.context_menu.state
     }
 }
 #[derive(Default, Clone)]
-#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "persistence", serde(default))]
 struct ContextMenu {
     state: MenuState,
     position: Pos2,
 }
 impl ContextMenu {
-    pub fn new(position: Pos2) -> Self {
+    pub fn root(position: Pos2) -> Self {
         Self {
             state: MenuState::default(),
             position,
