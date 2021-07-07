@@ -209,8 +209,6 @@ impl SubMenu {
 }
 
 #[derive(Clone)]
-#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "persistence", serde(default))]
 pub struct MenuState {
     sub_menu: Option<(Id, Box<MenuState>)>,
     pub rect: Rect,
