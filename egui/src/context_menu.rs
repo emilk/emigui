@@ -56,7 +56,7 @@ impl ContextMenuSystem {
         }
         MenuResponse::Stay
     }
-    pub fn ui_context_menu(&mut self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
+    pub fn context_menu(&mut self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
         match self.sense_click(response) {
             MenuResponse::Create(pos) => {
                 self.context_menu = Some(ContextMenuRoot::new(pos, response.id));
