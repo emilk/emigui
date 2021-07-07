@@ -453,7 +453,7 @@ impl Response {
     }
 
     pub fn context_menu(&self, add_contents: impl FnOnce(&mut Ui, &mut super::context_menu::MenuState)) -> &Self {
-        self.ctx.show_context_menu(&self, add_contents);
+        self.ctx.show_context_menu(self, add_contents);
         self
     }
 }
