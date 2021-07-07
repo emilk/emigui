@@ -90,12 +90,13 @@ impl super::View for WindowOptions {
         ui.horizontal(|ui| {
             ui.label("title:");
             ui.text_edit_singleline(title);
-            ui.context_menu(|ui, menu_state| {
-                if ui.button("Clear..").clicked() {
-                    *title = String::new();
-                    menu_state.close();
-                }
-            });
+        })
+        .response
+        .context_menu(|ui, menu_state| {
+            if ui.button("Clear..").clicked() {
+                *title = String::new();
+                menu_state.close();
+            }
         });
         ui.checkbox(title_bar, "title_bar");
         ui.checkbox(closable, "closable");

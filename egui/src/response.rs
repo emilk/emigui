@@ -451,6 +451,11 @@ impl Response {
             self.ctx.output().events.push(event);
         }
     }
+
+    pub fn context_menu(&self, add_contents: impl FnOnce(&mut Ui, &mut super::context_menu::MenuState)) -> &Self {
+        self.ctx.show_ui_context_menu(&self, add_contents);
+        self
+    }
 }
 
 impl Response {

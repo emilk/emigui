@@ -304,8 +304,8 @@ impl CtxRef {
     }
 
 
-    pub(crate) fn show_ui_context_menu(&self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui, &mut MenuState))  {
-        self.context_menu_system().ui_context_menu(ui, add_contents)
+    pub(crate) fn show_ui_context_menu(&self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState))  {
+        self.context_menu_system().ui_context_menu(response, add_contents)
     }
 }
 

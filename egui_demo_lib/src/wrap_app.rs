@@ -1,3 +1,4 @@
+use super::backend_panel::BackendPanel;
 /// All the different demo apps.
 #[derive(Default)]
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -32,7 +33,7 @@ impl Apps {
 pub struct WrapApp {
     selected_anchor: String,
     apps: Apps,
-    backend_panel: super::backend_panel::BackendPanel,
+    backend_panel: BackendPanel,
 }
 
 impl epi::App for WrapApp {
@@ -92,7 +93,9 @@ impl epi::App for WrapApp {
         if self.backend_panel.open || ctx.memory().everything_is_visible() {
             egui::SidePanel::left("backend_panel").show(ctx, |ui| {
                 self.backend_panel.ui(ui, frame);
-            });
+            })
+            .response
+            .context_menu(|ui, menu_state| BackendPanel::context_menu(ui, menu_state));
         }
 
         for (anchor, app) in self.apps.iter_mut() {
@@ -110,11 +113,6 @@ impl WrapApp {
         // A menu-bar is a horizontal layout with some special styles applied.
         // egui::menu::bar(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
-            ui.context_menu(|ui, _menu_state| {
-                if ui.button("Print something").clicked() {
-                    println!("something");
-                }
-            });
             dark_light_mode_switch(ui);
 
             ui.checkbox(&mut self.backend_panel.open, "💻 Backend");
@@ -147,6 +145,12 @@ impl WrapApp {
 
                 egui::warn_if_debug_build(ui);
             });
+        })
+        .response
+        .context_menu(|ui, _menu_state| {
+            if ui.button("Print something").clicked() {
+                println!("something");
+            }
         });
     }
 }

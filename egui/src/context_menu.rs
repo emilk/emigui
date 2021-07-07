@@ -12,29 +12,23 @@ pub struct ContextMenuSystem {
     context_menu: Option<ContextMenuRoot>,
 }
 impl ContextMenuSystem {
-    fn response(&mut self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> MenuResponse {
-        if let Some(context_menu) = &mut self.context_menu {
-            if context_menu.ui_id == ui.id() {
-                let response = context_menu.show(ui.ctx(), add_contents);
-                context_menu.rect = response.rect;
-
-                if context_menu.response.is_close() {
-                    return MenuResponse::Close;
-                }
-            }
-        }
-        let pointer = &ui.input().pointer;
-        if let Some(pos) = pointer.interact_pos() {
-            if pointer.any_pressed() {
+    fn sense_click(&mut self, response: &Response) -> MenuResponse {
+        let Response {
+            id,
+            ctx,
+            ..
+        } = response;
+        let pointer = &ctx.input().pointer;
+        if pointer.any_pressed() {
+            if let Some(pos) = pointer.interact_pos() {
                 let mut destroy = false;
                 let mut in_old_menu = false;
                 if let Some(context_menu) = &mut self.context_menu {
                     in_old_menu = context_menu.area_contains(pos);
-                    destroy = context_menu.ui_id == ui.id();
+                    destroy = context_menu.ui_id == *id;
                 }
-                let in_ui = ui.rect_contains_pointer(ui.max_rect_finite());
                 if !in_old_menu {
-                    if in_ui {
+                    if response.hovered() {
                         if pointer.button_down(PointerButton::Secondary) {
                             // todo: adapt to context
                             return MenuResponse::Create(pos);
@@ -49,15 +43,31 @@ impl ContextMenuSystem {
         }
         MenuResponse::Stay
     }
-    pub fn ui_context_menu(&mut self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
-        match self.response(ui, add_contents) {
+    fn show(&mut self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> MenuResponse {
+        if let Some(context_menu) = &mut self.context_menu {
+            if context_menu.ui_id == response.id {
+                let response = context_menu.show(&response.ctx, add_contents);
+                context_menu.rect = response.rect;
+
+                if context_menu.response.is_close() {
+                    return MenuResponse::Close;
+                }
+            }
+        }
+        MenuResponse::Stay
+    }
+    pub fn ui_context_menu(&mut self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
+        match self.sense_click(response) {
             MenuResponse::Create(pos) => {
-                self.context_menu = Some(ContextMenuRoot::new(pos, ui.id()));
+                self.context_menu = Some(ContextMenuRoot::new(pos, response.id));
             },
             MenuResponse::Close => {
                 self.context_menu = None
             },
             MenuResponse::Stay => {}
+        };
+        if let MenuResponse::Close = self.show(response, add_contents) {
+            self.context_menu = None
         }
     }
 }

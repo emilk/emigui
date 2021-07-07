@@ -103,40 +103,37 @@ impl BackendPanel {
         self.egui_windows.windows(ctx);
     }
 
-    fn context_menu(&mut self, ui: &mut egui::Ui) {
+    pub fn context_menu(ui: &mut egui::Ui, menu_state: &mut egui::context_menu::MenuState) {
         use egui::context_menu::SubMenu;
-        ui.context_menu(|ui, menu_state| {
-            if ui.button("Open...").clicked() {
-                menu_state.close();
-            }
-            SubMenu::new("SubMenu")
-                .show(ui, menu_state, |ui, menu_state| {
-                    if ui.button("Open...").clicked() {
-                        menu_state.close();
-                    }
-                    SubMenu::new("SubMenu")
-                        .show(ui, menu_state, |ui, menu_state| {
-                            if ui.button("Open...").clicked() {
-                                menu_state.close();
-                            }
-                            let _ = ui.button("Item");
-                        });
-                    let _ = ui.button("Item");
-                });
-            SubMenu::new("SubMenu")
-                .show(ui, menu_state, |ui, _menu_state| {
-                    let _ = ui.button("Item1");
-                    let _ = ui.button("Item2");
-                    let _ = ui.button("Item3");
-                    let _ = ui.button("Item4");
-                });
-            let _ = ui.button("Item");
-        });
+        if ui.button("Open...").clicked() {
+            menu_state.close();
+        }
+        SubMenu::new("SubMenu")
+            .show(ui, menu_state, |ui, menu_state| {
+                if ui.button("Open...").clicked() {
+                    menu_state.close();
+                }
+                SubMenu::new("SubMenu")
+                    .show(ui, menu_state, |ui, menu_state| {
+                        if ui.button("Open...").clicked() {
+                            menu_state.close();
+                        }
+                        let _ = ui.button("Item");
+                    });
+                let _ = ui.button("Item");
+            });
+        SubMenu::new("SubMenu")
+            .show(ui, menu_state, |ui, _menu_state| {
+                let _ = ui.button("Item1");
+                let _ = ui.button("Item2");
+                let _ = ui.button("Item3");
+                let _ = ui.button("Item4");
+            });
+        let _ = ui.button("Item");
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui, frame: &mut epi::Frame<'_>) {
         egui::trace!(ui);
-        self.context_menu(ui);
         ui.vertical_centered(|ui| {
             ui.heading("💻 Backend");
         });
