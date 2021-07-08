@@ -116,12 +116,15 @@ impl SubMenu {
     pub fn show(self, ui: &mut Ui, parent_state: &mut MenuState, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
         let button = ui.button(self.text);
         let pointer = &ui.input().pointer;
-        if !parent_state.hovering_current_submenu(pointer) && !parent_state.moving_towards_current_submenu(pointer) {
+        if !parent_state.moving_towards_current_submenu(pointer) {
             if button.hovered() {
                 parent_state.open_submenu(button.id, button.rect.right_top());
-            } else {
+            } else if !parent_state.hovering_current_submenu(pointer) {
                 parent_state.close_submenu();
             }
+        } else {
+            // ensure to repaint even when pointer is not moving
+            ui.ctx().request_repaint();
         }
         let responses = parent_state.get_submenu(button.id).map(|menu_state| {
             let response = menu_state.show(ui.ctx(), add_contents);
@@ -193,9 +196,10 @@ impl MenuState {
     }
     /// check if pointer is moving towards current submenu
     pub(crate) fn moving_towards_current_submenu(&self, pointer: &PointerState) -> bool{
-        if let Some(menu_state) = self.get_current_submenu() {
+        if pointer.is_still() { return false; }
+        if let Some(sub_menu) = self.get_current_submenu() {
             if let Some(pos) = pointer.hover_pos() {
-                return Self::points_at_left_of_rect(pos, pointer.velocity(), menu_state.rect);
+                return Self::points_at_left_of_rect(pos, pointer.velocity(), sub_menu.rect);
             }
         }
         false
