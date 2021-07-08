@@ -3,7 +3,7 @@ use super::{
     Response, CtxRef,
     Pos2, Sense, Vec2,
     PointerState,
-    Style,
+    Style, Button,
 };
 
 #[derive(Default, Clone)]
@@ -112,11 +112,18 @@ impl SubMenu {
         }
     }
     pub fn show(self, ui: &mut Ui, parent_state: &mut MenuState, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
-        let button = ui.button(self.text);
+        let parent_id = ui.id();
+        let sub_id = parent_id.with(format!("{:?}", ui.placer.cursor().min));
+        let mut button = Button::new(format!("{} ⏵", self.text));
+        if Some(sub_id) == parent_state.get_sub_id() {
+            button = button.fill(ui.visuals().widgets.open.bg_fill);
+            button = button.stroke(ui.visuals().widgets.open.bg_stroke);
+        }
+        let button = ui.add(button);
         let pointer = &ui.input().pointer;
         if !parent_state.moving_towards_current_submenu(pointer) {
             if button.hovered() {
-                parent_state.open_submenu(button.id, button.rect.right_top());
+                parent_state.open_submenu(sub_id, button.rect.right_top());
             } else if !parent_state.hovering_current_submenu(pointer) {
                 parent_state.close_submenu();
             }
@@ -124,7 +131,7 @@ impl SubMenu {
             // ensure to repaint even when pointer is not moving
             ui.ctx().request_repaint();
         }
-        let responses = parent_state.get_submenu(button.id).map(|menu_state| {
+        let responses = parent_state.get_submenu(sub_id).map(|menu_state| {
             let response = menu_state.show(ui.ctx(), add_contents);
             menu_state.rect = response.rect;
             (menu_state.response.clone(), response)
@@ -144,26 +151,18 @@ pub struct MenuState {
     pub rect: Rect,
     response: MenuResponse,
 }
-impl Default for MenuState {
-    fn default() -> Self {
-        Self {
-            rect: Rect::NOTHING,
-            sub_menu: None,
-            response: MenuResponse::Stay
-        }
-    }
-}
 impl MenuState {
     pub fn new(position: Pos2) -> Self {
         Self {
             rect: Rect::from_min_size(position, Vec2::ZERO),
-            ..Default::default()
+            sub_menu: None,
+            response: MenuResponse::Stay
         }
     }
     pub(crate) fn show(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
         crate::menu::menu_ui(
             ctx,
-            Id::new(format!("context_menu_{:#?}", self.rect.min)),
+            Id::new(format!("{:?}", self.rect)),
             self.rect.min,
             Style::default(),
             |ui| add_contents(ui, self)
@@ -212,6 +211,9 @@ impl MenuState {
         if response.is_close() {
             self.response = response;
         }
+    }
+    fn get_sub_id(&self) -> Option<Id> {
+        self.sub_menu.as_ref().map(|(id, _)| *id)
     }
     fn get_current_submenu(&self) -> Option<&MenuState> {
         self.sub_menu.as_ref().map(|(_, sub)| sub.as_ref())
