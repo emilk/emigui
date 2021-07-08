@@ -6,7 +6,7 @@ use super::{
     Style, Button,
 };
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct ContextMenuSystem {
     context_menu: Option<ContextMenuRoot>,
 }
@@ -76,7 +76,6 @@ impl MenuResponse {
     }
 }
 /// Context menu root associated with an Id from a Response
-#[derive(Clone)]
 struct ContextMenuRoot {
     context_menu: MenuState,
     ui_id: Id,
@@ -147,10 +146,9 @@ impl<'a> SubMenu<'a> {
     }
 }
 
-#[derive(Clone)]
 pub struct MenuState {
     sub_menu: Option<(Id, Box<MenuState>)>,
-    pub rect: Rect,
+    rect: Rect,
     response: MenuResponse,
 }
 impl MenuState {
