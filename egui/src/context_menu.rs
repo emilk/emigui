@@ -15,7 +15,7 @@ pub struct ContextMenuSystem {
 impl ContextMenuSystem {
     /// sense if a context menu needs to be (re-)created or destroyed
     fn sense_click(&mut self, response: &Response) -> MenuResponse {
-        let response = response.interact(Sense::click_and_drag());
+        let response = response.interact(Sense::click());
         let pointer = &response.ctx.input().pointer;
         if pointer.any_click() {
             if let Some(pos) = pointer.interact_pos() {
