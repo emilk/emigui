@@ -104,17 +104,16 @@ impl BackendPanel {
     }
 
     pub fn context_menu(ui: &mut egui::Ui, menu_state: &mut egui::context_menu::MenuState) {
-        use egui::context_menu::SubMenu;
         if ui.button("Open...").clicked() {
             menu_state.close();
         }
-        SubMenu::new("SubMenu")
-            .show(ui, menu_state, |ui, menu_state| {
+        menu_state.submenu("SubMenu")
+            .show(ui, |ui, menu_state| {
                 if ui.button("Open...").clicked() {
                     menu_state.close();
                 }
-                SubMenu::new("SubMenu")
-                    .show(ui, menu_state, |ui, menu_state| {
+                menu_state.submenu("SubMenu")
+                    .show(ui, |ui, menu_state| {
                         if ui.button("Open...").clicked() {
                             menu_state.close();
                         }
@@ -122,8 +121,8 @@ impl BackendPanel {
                     });
                 let _ = ui.button("Item");
             });
-        SubMenu::new("SubMenu")
-            .show(ui, menu_state, |ui, _menu_state| {
+        menu_state.submenu("SubMenu")
+            .show(ui, |ui, _menu_state| {
                 let _ = ui.button("Item1");
                 let _ = ui.button("Item2");
                 let _ = ui.button("Item3");

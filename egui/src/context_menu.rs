@@ -100,45 +100,46 @@ impl std::ops::DerefMut for ContextMenuRoot {
         &mut self.context_menu
     }
 }
-#[derive(Clone)]
-pub struct SubMenu {
+pub struct SubMenu<'a> {
     text: String,
+    parent_state: &'a mut MenuState,
 }
-impl SubMenu {
+impl<'a> SubMenu<'a> {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn new(text: impl ToString) -> Self {
+    fn new(text: impl ToString, parent_state: &'a mut MenuState) -> Self {
         Self {
             text: text.to_string(),
+            parent_state,
         }
     }
-    pub fn show(self, ui: &mut Ui, parent_state: &mut MenuState, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
+    pub fn show(self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
         let parent_id = ui.id();
-        let sub_id = parent_id.with(format!("{:?}", ui.placer.cursor().min));
+        let cursor_rect = ui.placer.cursor();
+        let sub_id = parent_id.with(format!("{:?}", cursor_rect.min));
         let mut button = Button::new(format!("{} ⏵", self.text));
         let pointer = ui.input().pointer.clone();
-        if Some(sub_id) == parent_state.get_sub_id()
-            && (parent_state.hovering_current_submenu(&pointer) || parent_state.moving_towards_current_submenu(&pointer)) {
+        if Some(sub_id) == self.parent_state.get_sub_id() {
             button = button.fill(ui.visuals().widgets.open.bg_fill);
             button = button.stroke(ui.visuals().widgets.open.bg_stroke);
         }
         let button = ui.add(button);
-        if !parent_state.moving_towards_current_submenu(&pointer) {
+        if !self.parent_state.moving_towards_current_submenu(&pointer) {
             if button.hovered() {
-                parent_state.open_submenu(sub_id, button.rect.right_top());
-            } else if !parent_state.hovering_current_submenu(&pointer) {
-                parent_state.close_submenu();
+                self.parent_state.open_submenu(sub_id, button.rect.right_top());
+            } else if !self.parent_state.hovering_current_submenu(&pointer) {
+                self.parent_state.close_submenu();
             }
         } else {
             // ensure to repaint even when pointer is not moving
             ui.ctx().request_repaint();
         }
-        let responses = parent_state.get_submenu(sub_id).map(|menu_state| {
+        let responses = self.parent_state.get_submenu(sub_id).map(|menu_state| {
             let response = menu_state.show(ui.ctx(), add_contents);
             menu_state.rect = response.rect;
             (menu_state.response.clone(), response)
         });
         if let Some((menu_response, response)) = responses {
-            parent_state.cascade_response(menu_response);
+            self.parent_state.cascade_response(menu_response);
             response
         } else {
             button
@@ -153,14 +154,22 @@ pub struct MenuState {
     response: MenuResponse,
 }
 impl MenuState {
-    pub fn new(position: Pos2) -> Self {
+    /// close menu hierarchy
+    pub fn close(&mut self) {
+        self.response = MenuResponse::Close;
+    }
+    /// show a sub-menu
+    pub fn submenu(&'_ mut self, text: impl ToString) -> SubMenu<'_> {
+        SubMenu::new(text, self)
+    }
+    fn new(position: Pos2) -> Self {
         Self {
             rect: Rect::from_min_size(position, Vec2::ZERO),
             sub_menu: None,
             response: MenuResponse::Stay
         }
     }
-    pub(crate) fn show(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
+    fn show(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
         crate::menu::menu_ui(
             ctx,
             Id::new(format!("{:?}", self.rect)),
@@ -171,7 +180,7 @@ impl MenuState {
         .response
     }
     /// check if position is in the menu hierarchy's area
-    pub(crate) fn area_contains(&self, pos: Pos2) -> bool{
+    fn area_contains(&self, pos: Pos2) -> bool{
         self.rect.contains(pos) ||
             self.sub_menu.as_ref()
                 .map(|(_, sub)| sub.area_contains(pos))
@@ -185,7 +194,7 @@ impl MenuState {
         bottom_a - vel_a >= 0.0 && top_a - vel_a <= 0.0
     }
     /// check if pointer is moving towards current submenu
-    pub(crate) fn moving_towards_current_submenu(&self, pointer: &PointerState) -> bool{
+    fn moving_towards_current_submenu(&self, pointer: &PointerState) -> bool{
         if pointer.is_still() { return false; }
         if let Some(sub_menu) = self.get_current_submenu() {
             if let Some(pos) = pointer.hover_pos() {
@@ -195,17 +204,13 @@ impl MenuState {
         false
     }
     /// check if pointer is hovering current submenu
-    pub(crate) fn hovering_current_submenu(&self, pointer: &PointerState) -> bool{
+    fn hovering_current_submenu(&self, pointer: &PointerState) -> bool{
         if let Some(sub_menu) = self.get_current_submenu() {
             if let Some(pos) = pointer.hover_pos() {
                 return sub_menu.area_contains(pos);
             }
         }
         false
-    }
-    /// set close response
-    pub fn close(&mut self) {
-        self.response = MenuResponse::Close;
     }
     /// cascade close response to menu root
     fn cascade_response(&mut self, response: MenuResponse) {
