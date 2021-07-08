@@ -1,11 +1,9 @@
 use super::{
-    Color32, Id, Rect, Ui,
-    Frame, Area,
+    Id, Rect, Ui,
     Response, CtxRef,
-    Pos2, Order,
-    Align, Layout,
-    Sense, Vec2,
+    Pos2, Sense, Vec2,
     PointerState,
+    Style,
 };
 
 #[derive(Default, Clone)]
@@ -163,22 +161,14 @@ impl MenuState {
         }
     }
     pub(crate) fn show(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
-        Area::new(format!("context_menu_{:#?}", self.rect.min))
-            .order(Order::Foreground)
-            .fixed_pos(self.rect.min)
-            .interactable(true)
-            .show(ctx, |ui| {
-                Frame::none()
-                    .fill(Color32::BLACK)
-                    .corner_radius(3.0)
-                    .margin((0.0, 3.0))
-                    .show(ui, |ui|
-                        ui.with_layout(
-                            Layout::top_down_justified(Align::LEFT),
-                            |ui| add_contents(ui, self),
-                        )
-                    );
-            })
+        crate::menu::menu_ui(
+            ctx,
+            Id::new(format!("context_menu_{:#?}", self.rect.min)),
+            self.rect.min,
+            Style::default(),
+            |ui| add_contents(ui, self)
+        )
+        .response
     }
     /// check if position is in the menu hierarchy's area
     pub(crate) fn area_contains(&self, pos: Pos2) -> bool{
