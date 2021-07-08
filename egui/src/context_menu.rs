@@ -4,7 +4,8 @@ use super::{
     Response, CtxRef,
     Pos2, Order,
     Align, Layout,
-    Sense,
+    Sense, Vec2,
+    PointerState,
 };
 
 #[derive(Default, Clone)]
@@ -170,23 +171,17 @@ impl SubMenu {
     }
     pub fn show(self, ui: &mut Ui, parent_state: &mut MenuState, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
         let button = ui.button(self.text);
-        let mut sub_hovered = false;
-        if let Some(sub_menu) = parent_state.get_submenu(button.id) {
-            if let Some(pos) = ui.input().pointer.hover_pos() {
-                sub_hovered = sub_menu.area_contains(pos);
-            }
-        }
-        if !sub_hovered {
+        let pointer = &ui.input().pointer;
+        if !parent_state.hovering_current_submenu(pointer) && !parent_state.moving_towards_current_submenu(pointer) {
             if button.hovered() {
                 parent_state.open_submenu(button.id);
             } else {
-                parent_state.close_submenu(button.id);
+                parent_state.close_submenu();
             }
         }
         let responses = parent_state.get_submenu(button.id).map(|menu_state| {
             let response = ContextMenu::sub_menu(button.rect.right_top(), menu_state.clone())
                 .show(ui.ctx(), |ui| add_contents(ui, menu_state));
-            // set submenu bounding box
             menu_state.rect = response.rect;
             (menu_state.response.clone(), response)
         });
@@ -222,6 +217,28 @@ impl MenuState {
                 .map(|(_, sub)| sub.area_contains(pos))
                 .unwrap_or(false)
     }
+    fn points_at_left_of_rect(pos: Pos2, dir: Vec2, rect: Rect) -> bool {
+        let vel_a = dir.angle();
+        let top_a = (rect.left_top() - pos).angle();
+        let bottom_a = (rect.left_bottom() - pos).angle();
+        bottom_a - vel_a >= 0.0 && top_a - vel_a <= 0.0
+    }
+    pub(crate) fn moving_towards_current_submenu(&self, pointer: &PointerState) -> bool{
+        if let Some(menu_state) = self.get_current_submenu() {
+            if let Some(pos) = pointer.hover_pos() {
+                return Self::points_at_left_of_rect(pos, pointer.velocity(), menu_state.rect);
+            }
+        }
+        false
+    }
+    pub(crate) fn hovering_current_submenu(&self, pointer: &PointerState) -> bool{
+        if let Some(sub_menu) = self.get_current_submenu() {
+            if let Some(pos) = pointer.hover_pos() {
+                return sub_menu.area_contains(pos);
+            }
+        }
+        false
+    }
     pub fn close(&mut self) {
         self.response = MenuResponse::Close;
     }
@@ -229,6 +246,12 @@ impl MenuState {
         if response.is_close() {
             self.response = response;
         }
+    }
+    fn get_current_submenu_mut(&mut self) -> Option<&mut MenuState> {
+        self.sub_menu.as_mut().map(|(_, sub)| sub.as_mut())
+    }
+    fn get_current_submenu(&self) -> Option<&MenuState> {
+        self.sub_menu.as_ref().map(|(_, sub)| sub.as_ref())
     }
     fn get_submenu(&mut self, id: Id) -> Option<&mut MenuState> {
         self.sub_menu.as_mut().and_then(|(k, sub)| if id == *k {
@@ -245,12 +268,8 @@ impl MenuState {
         }
         self.sub_menu = Some((id, Box::new(MenuState::default())));
     }
-    fn close_submenu(&mut self, id: Id) {
-        if let Some((k, _)) = self.sub_menu {
-            if k == id {
-                self.sub_menu = None;
-            }
-        }
+    fn close_submenu(&mut self) {
+        self.sub_menu = None;
     }
     pub fn toggle_submenu(&mut self, id: Id) {
         if let Some((k, _)) = self.sub_menu.take() {
