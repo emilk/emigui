@@ -4,7 +4,6 @@ use super::{
     Response, CtxRef,
     Pos2, Order,
     Align, Layout,
-    PointerButton,
     Sense,
 };
 
@@ -64,7 +63,6 @@ impl ContextMenuSystem {
     }
 }
 #[derive(Clone, PartialEq)]
-#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 enum MenuResponse {
     Close,
     Stay,
@@ -232,7 +230,7 @@ impl MenuState {
             self.response = response;
         }
     }
-    pub fn get_submenu(&mut self, id: Id) -> Option<&mut MenuState> {
+    fn get_submenu(&mut self, id: Id) -> Option<&mut MenuState> {
         self.sub_menu.as_mut().and_then(|(k, sub)| if id == *k {
             Some(sub.as_mut())
         } else {
