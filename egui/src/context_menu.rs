@@ -5,6 +5,7 @@ use super::{
     Pos2, Order,
     Align, Layout,
     PointerButton,
+    Sense,
 };
 
 #[derive(Default, Clone)]
@@ -13,29 +14,20 @@ pub struct ContextMenuSystem {
 }
 impl ContextMenuSystem {
     fn sense_click(&mut self, response: &Response) -> MenuResponse {
-        let Response {
-            id,
-            ctx,
-            ..
-        } = response;
-        let pointer = &ctx.input().pointer;
-        if pointer.any_pressed() {
+        let response = response.interact(Sense::click_and_drag());
+        let pointer = &response.ctx.input().pointer;
+        if pointer.any_click() {
             if let Some(pos) = pointer.interact_pos() {
                 let mut destroy = false;
                 let mut in_old_menu = false;
                 if let Some(context_menu) = &mut self.context_menu {
                     in_old_menu = context_menu.area_contains(pos);
-                    destroy = context_menu.ui_id == *id;
+                    destroy = context_menu.ui_id == response.id;
                 }
                 if !in_old_menu {
-                    if response.hovered() {
-                        if pointer.button_down(PointerButton::Secondary) {
-                            // todo: adapt to context
-                            return MenuResponse::Create(pos);
-                        } else {
-                            return MenuResponse::Close;
-                        }
-                    } else if destroy {
+                    if response.secondary_clicked() {
+                        return MenuResponse::Create(pos);
+                    } else if response.clicked() || destroy {
                         return MenuResponse::Close;
                     }
                 }
