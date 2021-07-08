@@ -115,16 +115,17 @@ impl SubMenu {
         let parent_id = ui.id();
         let sub_id = parent_id.with(format!("{:?}", ui.placer.cursor().min));
         let mut button = Button::new(format!("{} ⏵", self.text));
-        if Some(sub_id) == parent_state.get_sub_id() {
+        let pointer = ui.input().pointer.clone();
+        if Some(sub_id) == parent_state.get_sub_id()
+            && (parent_state.hovering_current_submenu(&pointer) || parent_state.moving_towards_current_submenu(&pointer)) {
             button = button.fill(ui.visuals().widgets.open.bg_fill);
             button = button.stroke(ui.visuals().widgets.open.bg_stroke);
         }
         let button = ui.add(button);
-        let pointer = &ui.input().pointer;
-        if !parent_state.moving_towards_current_submenu(pointer) {
+        if !parent_state.moving_towards_current_submenu(&pointer) {
             if button.hovered() {
                 parent_state.open_submenu(sub_id, button.rect.right_top());
-            } else if !parent_state.hovering_current_submenu(pointer) {
+            } else if !parent_state.hovering_current_submenu(&pointer) {
                 parent_state.close_submenu();
             }
         } else {
