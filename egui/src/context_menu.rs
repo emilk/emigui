@@ -13,6 +13,7 @@ pub struct ContextMenuSystem {
     context_menu: Option<ContextMenuRoot>,
 }
 impl ContextMenuSystem {
+    /// sense if a context menu needs to be (re-)created or destroyed
     fn sense_click(&mut self, response: &Response) -> MenuResponse {
         let response = response.interact(Sense::click_and_drag());
         let pointer = &response.ctx.input().pointer;
@@ -35,6 +36,7 @@ impl ContextMenuSystem {
         }
         MenuResponse::Stay
     }
+    /// show the current context menu
     fn show(&mut self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> MenuResponse {
         if let Some(context_menu) = &mut self.context_menu {
             if context_menu.ui_id == response.id {
@@ -48,6 +50,7 @@ impl ContextMenuSystem {
         }
         MenuResponse::Stay
     }
+    /// should be called from Context on a Response
     pub fn context_menu(&mut self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
         match self.sense_click(response) {
             MenuResponse::Create(pos) => {
@@ -74,88 +77,29 @@ impl MenuResponse {
         *self == Self::Close
     }
 }
+/// Context menu root associated with an Id from a Response
 #[derive(Clone)]
 struct ContextMenuRoot {
-    context_menu: ContextMenu,
+    context_menu: MenuState,
     ui_id: Id,
 }
 impl ContextMenuRoot {
     pub fn new(position: Pos2, ui_id: Id) -> Self {
         Self {
-            context_menu: ContextMenu::root(position),
+            context_menu: MenuState::new(position),
             ui_id,
         }
-    }
-    pub(crate) fn show(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
-        self.context_menu.show_root(ctx, add_contents)
     }
 }
 impl std::ops::Deref for ContextMenuRoot {
     type Target = MenuState;
     fn deref(&self) -> &Self::Target {
-        &self.context_menu.state
+        &self.context_menu
     }
 }
 impl std::ops::DerefMut for ContextMenuRoot {
     fn deref_mut(&mut self) -> &mut <Self as std::ops::Deref>::Target {
-        &mut self.context_menu.state
-    }
-}
-#[derive(Default, Clone)]
-struct ContextMenu {
-    state: MenuState,
-    position: Pos2,
-}
-impl ContextMenu {
-    pub fn root(position: Pos2) -> Self {
-        Self {
-            state: MenuState::default(),
-            position,
-        }
-    }
-    pub fn sub_menu(position: Pos2, state: MenuState) -> Self {
-        Self {
-            state,
-            position,
-        }
-    }
-    fn show_impl(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui)) -> Response {
-        Area::new(format!("context_menu_{:#?}", self.position))
-            .order(Order::Foreground)
-            .fixed_pos(self.position)
-            .interactable(true)
-            .show(ctx, |ui| {
-                Frame::none()
-                    .fill(Color32::BLACK)
-                    .corner_radius(3.0)
-                    .margin((0.0, 3.0))
-                    .show(ui, |ui|
-                        ui.with_layout(
-                            Layout::top_down_justified(Align::LEFT),
-                            add_contents,
-                        )
-                    );
-            })
-    }
-    pub(crate) fn show_root(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
-        let mut state = self.state.clone();
-        let response = self.show_impl(ctx, |ui| add_contents(ui, &mut state));
-        self.state = state;
-        response
-    }
-    pub fn show(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui)) -> Response {
-        self.show_impl(ctx, add_contents)
-    }
-}
-impl std::ops::Deref for ContextMenu {
-    type Target = MenuState;
-    fn deref(&self) -> &Self::Target {
-        &self.state
-    }
-}
-impl std::ops::DerefMut for ContextMenu {
-    fn deref_mut(&mut self) -> &mut <Self as std::ops::Deref>::Target {
-        &mut self.state
+        &mut self.context_menu
     }
 }
 #[derive(Clone)]
@@ -174,14 +118,13 @@ impl SubMenu {
         let pointer = &ui.input().pointer;
         if !parent_state.hovering_current_submenu(pointer) && !parent_state.moving_towards_current_submenu(pointer) {
             if button.hovered() {
-                parent_state.open_submenu(button.id);
+                parent_state.open_submenu(button.id, button.rect.right_top());
             } else {
                 parent_state.close_submenu();
             }
         }
         let responses = parent_state.get_submenu(button.id).map(|menu_state| {
-            let response = ContextMenu::sub_menu(button.rect.right_top(), menu_state.clone())
-                .show(ui.ctx(), |ui| add_contents(ui, menu_state));
+            let response = menu_state.show(ui.ctx(), add_contents);
             menu_state.rect = response.rect;
             (menu_state.response.clone(), response)
         });
@@ -209,20 +152,46 @@ impl Default for MenuState {
         }
     }
 }
-#[allow(unused)]
 impl MenuState {
+    pub fn new(position: Pos2) -> Self {
+        Self {
+            rect: Rect::from_min_size(position, Vec2::ZERO),
+            ..Default::default()
+        }
+    }
+    pub(crate) fn show(&mut self, ctx: &CtxRef, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
+        Area::new(format!("context_menu_{:#?}", self.rect.min))
+            .order(Order::Foreground)
+            .fixed_pos(self.rect.min)
+            .interactable(true)
+            .show(ctx, |ui| {
+                Frame::none()
+                    .fill(Color32::BLACK)
+                    .corner_radius(3.0)
+                    .margin((0.0, 3.0))
+                    .show(ui, |ui|
+                        ui.with_layout(
+                            Layout::top_down_justified(Align::LEFT),
+                            |ui| add_contents(ui, self),
+                        )
+                    );
+            })
+    }
+    /// check if position is in the menu hierarchy's area
     pub(crate) fn area_contains(&self, pos: Pos2) -> bool{
         self.rect.contains(pos) ||
             self.sub_menu.as_ref()
                 .map(|(_, sub)| sub.area_contains(pos))
                 .unwrap_or(false)
     }
+    /// check if dir points from pos towards left side of rect
     fn points_at_left_of_rect(pos: Pos2, dir: Vec2, rect: Rect) -> bool {
         let vel_a = dir.angle();
         let top_a = (rect.left_top() - pos).angle();
         let bottom_a = (rect.left_bottom() - pos).angle();
         bottom_a - vel_a >= 0.0 && top_a - vel_a <= 0.0
     }
+    /// check if pointer is moving towards current submenu
     pub(crate) fn moving_towards_current_submenu(&self, pointer: &PointerState) -> bool{
         if let Some(menu_state) = self.get_current_submenu() {
             if let Some(pos) = pointer.hover_pos() {
@@ -231,6 +200,7 @@ impl MenuState {
         }
         false
     }
+    /// check if pointer is hovering current submenu
     pub(crate) fn hovering_current_submenu(&self, pointer: &PointerState) -> bool{
         if let Some(sub_menu) = self.get_current_submenu() {
             if let Some(pos) = pointer.hover_pos() {
@@ -239,16 +209,15 @@ impl MenuState {
         }
         false
     }
+    /// set close response
     pub fn close(&mut self) {
         self.response = MenuResponse::Close;
     }
+    /// cascade close response to menu root
     fn cascade_response(&mut self, response: MenuResponse) {
         if response.is_close() {
             self.response = response;
         }
-    }
-    fn get_current_submenu_mut(&mut self) -> Option<&mut MenuState> {
-        self.sub_menu.as_mut().map(|(_, sub)| sub.as_mut())
     }
     fn get_current_submenu(&self) -> Option<&MenuState> {
         self.sub_menu.as_ref().map(|(_, sub)| sub.as_ref())
@@ -260,24 +229,16 @@ impl MenuState {
             None
         })
     }
-    fn open_submenu(&mut self, id: Id) {
+    /// open submenu at position, if not already open
+    fn open_submenu(&mut self, id: Id, pos: Pos2) {
         if let Some((k, _)) = self.sub_menu {
             if k == id {
                 return;
             }
         }
-        self.sub_menu = Some((id, Box::new(MenuState::default())));
+        self.sub_menu = Some((id, Box::new(MenuState::new(pos))));
     }
     fn close_submenu(&mut self) {
         self.sub_menu = None;
-    }
-    pub fn toggle_submenu(&mut self, id: Id) {
-        if let Some((k, _)) = self.sub_menu.take() {
-            if k == id {
-                self.sub_menu = None;
-                return;
-            }
-        }
-        self.sub_menu = Some((id, Box::new(MenuState::default())));
     }
 }
