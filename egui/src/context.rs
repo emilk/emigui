@@ -387,8 +387,6 @@ impl Context {
         self.memory.lock()
     }
 
-    /// Stores all the egui state.
-    /// If you want to store/restore egui, serialize this.
     pub fn context_menu_system(&self) -> MutexGuard<'_, ContextMenuSystem> {
         self.context_menu_system.lock()
     }
