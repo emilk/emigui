@@ -124,7 +124,6 @@ impl<'a> SubMenu<'a> {
             .text_style(TextStyle::Button)
             .text_color(ui.visuals().widgets.inactive.fg_stroke.color);
         let mut frame = Frame::none();
-        let pointer = &ui.input().pointer.clone();
         let open = self.parent_state.is_open(sub_id);
         if open {
             icon = icon.text_color(ui.visuals().widgets.hovered.fg_stroke.color);
@@ -133,39 +132,20 @@ impl<'a> SubMenu<'a> {
         }
         let padding = ui.spacing().button_padding.x; 
         let button = frame.show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.with_layout(Layout::left_to_right(), |ui| {
-                    ui.add_space(padding);
-                    ui.label(label);
+                ui.horizontal(|ui| {
+                    ui.with_layout(Layout::left_to_right(), |ui| {
+                        ui.add_space(padding);
+                        ui.label(label);
+                    });
+                    ui.with_layout(Layout::right_to_left(), |ui| {
+                        ui.add(icon);
+                        ui.add_space(padding);
+                    });
                 });
-                ui.with_layout(Layout::right_to_left(), |ui| {
-                    ui.add(icon);
-                    ui.add_space(padding);
-                });
-            });
-        })
-        .response;
-        if self.parent_state.moving_towards_current_submenu(pointer) {
-            // ensure to repaint once even when pointer is not moving
-            ui.ctx().request_repaint();
-        } else if !open && button.hovered() {
-            let pos = button.rect.right_top();
-            self.parent_state.open_submenu(sub_id, pos);
-        } else if open && !button.hovered() && !self.parent_state.hovering_current_submenu(pointer) {
-            self.parent_state.close_submenu();
-        }
-        let responses = self.parent_state.get_submenu(sub_id)
-            .map(|menu_state| {
-                let response = menu_state.show(ui.ctx(), sub_id, add_contents);
-                menu_state.rect = response.rect;
-                (menu_state.response.clone(), response)
-            });
-        if let Some((menu_response, response)) = responses {
-            self.parent_state.cascade_response(menu_response);
-            response
-        } else {
-            button
-        }
+            })
+            .response;
+        self.parent_state.submenu_button_interaction(ui, sub_id, &button);
+        self.parent_state.show_submenu(ui.ctx(), sub_id, add_contents).unwrap_or(button)
     }
 }
 
@@ -189,6 +169,30 @@ impl MenuState {
             sub_menu: None,
             response: MenuResponse::Stay
         }
+    }
+    /// sense button interaction opening and closing submenu
+    fn submenu_button_interaction(&mut self, ui: &mut Ui, sub_id: Id, button: &Response) {
+        let pointer = &ui.input().pointer.clone();
+        let open = self.is_open(sub_id);
+        if self.moving_towards_current_submenu(pointer) {
+            // ensure to repaint once even when pointer is not moving
+            ui.ctx().request_repaint();
+        } else if !open && button.hovered() {
+            let pos = button.rect.right_top();
+            self.open_submenu(sub_id, pos);
+        } else if open && !button.hovered() && !self.hovering_current_submenu(pointer) {
+            self.close_submenu();
+        }
+    }
+    fn show_submenu(&mut self, ctx: &CtxRef, id: Id, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Option<Response> {
+        let (sub_response, response) = self.get_submenu(id)
+            .map(|sub| {
+                let response = sub.show(ctx, id, add_contents);
+                sub.rect = response.rect;
+                (sub.response.clone(), response)
+            })?;
+        self.cascade_response(sub_response);
+        Some(response)
     }
     fn show(&mut self, ctx: &CtxRef, id: Id, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
         crate::menu::menu_ui(
@@ -242,14 +246,14 @@ impl MenuState {
         }
         false
     }
-    fn is_open(&self, id: Id) -> bool {
-        self.get_sub_id() == Some(id)
-    }
     /// cascade close response to menu root
     fn cascade_response(&mut self, response: MenuResponse) {
         if response.is_close() {
             self.response = response;
         }
+    }
+    fn is_open(&self, id: Id) -> bool {
+        self.get_sub_id() == Some(id)
     }
     fn get_sub_id(&self) -> Option<Id> {
         self.sub_menu.as_ref().map(|(id, _)| *id)
