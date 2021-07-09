@@ -6,7 +6,7 @@ use super::{
     Style, TextStyle,
     style::Spacing,
     Frame, Label,
-    Layout, Align,
+    Layout,
 };
 
 #[derive(Default)]
@@ -134,7 +134,7 @@ impl<'a> SubMenu<'a> {
         let padding = ui.spacing().button_padding.x; 
         let button = frame.show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.with_layout(Layout::left_to_right().with_cross_align(Align::LEFT), |ui| {
+                ui.with_layout(Layout::left_to_right(), |ui| {
                     ui.add_space(padding);
                     ui.label(label);
                 });
