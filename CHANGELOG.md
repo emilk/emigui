@@ -12,6 +12,7 @@ NOTE: [`eframe`](eframe/CHANGELOG.md), [`egui_web`](egui_web/CHANGELOG.md) and [
   * [Line styles](https://github.com/emilk/egui/pull/482)
 * [Progress bar](https://github.com/emilk/egui/pull/519)
 * `Grid::num_columns`: allow the last column to take up the rest of the space of the parent `Ui`.
+* Add `show_background` and `show_axes` methods to `Plot`.
 
 
 ## 0.13.1 - 2021-06-28 - Plot fixes
