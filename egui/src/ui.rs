@@ -470,6 +470,10 @@ impl Ui {
         self.available_size().x
     }
 
+    pub fn available_height(&self) -> f32 {
+        self.available_size().y
+    }
+
     /// In case of a wrapping layout, how much space is left on this row/column?
     pub fn available_size_before_wrap(&self) -> Vec2 {
         self.placer.available_rect_before_wrap().size()
