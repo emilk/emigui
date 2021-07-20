@@ -15,6 +15,7 @@ NOTE: [`eframe`](eframe/CHANGELOG.md), [`egui_web`](egui_web/CHANGELOG.md) and [
 
 ### Fixed 🐛
 * Fix custom font definitions getting replaced when `pixels_per_point` is changed.
+* Fix case where `Plot`'s `min_auto_bounds` could be ignored after the first call to `Plot::ui`.
 
 
 ## 0.13.1 - 2021-06-28 - Plot fixes
