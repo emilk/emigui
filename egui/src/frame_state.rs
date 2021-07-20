@@ -24,7 +24,7 @@ pub(crate) struct FrameState {
     /// If a tooltip has been shown this frame, where was it?
     /// This is used to prevent multiple tooltips to cover each other.
     /// Initialized to `None` at the start of each frame.
-    pub(crate) tooltip_rect: Option<(Id, Rect)>,
+    pub(crate) tooltip_rect: Option<(Id, Rect, usize)>,
 
     /// Cleared by the first `ScrollArea` that makes use of it.
     pub(crate) scroll_delta: Vec2,
