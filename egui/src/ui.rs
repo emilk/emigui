@@ -579,7 +579,7 @@ impl Ui {
     /// ## How sizes are negotiated
     /// Each widget should have a *minimum desired size* and a *desired size*.
     /// When asking for space, ask AT LEAST for your minimum, and don't ask for more than you need.
-    /// If you want to fill the space, ask about `available().size()` and use that.
+    /// If you want to fill the space, ask about `available_size()` and use that.
     ///
     /// You may get MORE space than you asked for, for instance
     /// for justified layouts, like in menus.
