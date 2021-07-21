@@ -6,6 +6,14 @@ enum Enum {
     Third,
 }
 
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
+enum Plot {
+    Sin,
+    Bell,
+    Sigmoid,
+}
+
 /// Shows off one example of each major type of widget.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 pub struct WidgetGallery {
@@ -13,6 +21,7 @@ pub struct WidgetGallery {
     visible: bool,
     boolean: bool,
     radio: Enum,
+    plot: Plot,
     scalar: f32,
     string: String,
     color: egui::Color32,
@@ -30,6 +39,7 @@ impl Default for WidgetGallery {
             string: Default::default(),
             color: egui::Color32::LIGHT_BLUE.linear_multiply(0.5),
             animate_progress_bar: false,
+            plot: Plot::Sin,
         }
     }
 }
@@ -100,6 +110,7 @@ impl WidgetGallery {
             string,
             color,
             animate_progress_bar,
+            plot,
         } = self;
 
         ui.add(doc_link_label("Label", "label,heading"));
@@ -212,7 +223,19 @@ impl WidgetGallery {
         ui.end_row();
 
         ui.add(doc_link_label("Plot", "plot"));
-        ui.add(example_plot());
+        ui.add(example_plot(plot)).context_menu(|ui, menu_state| {
+            if ui.button("Sin").clicked() {
+                *plot = Plot::Sin;
+                menu_state.close();
+            } else if ui.button("Bell").clicked() {
+                *plot = Plot::Bell;
+                menu_state.close();
+            } else if ui.button("Sigmoid").clicked() {
+                *plot = Plot::Sigmoid;
+                menu_state.close();
+            }
+        });
+
         ui.end_row();
 
         ui.hyperlink_to(
@@ -226,16 +249,26 @@ impl WidgetGallery {
         ui.end_row();
     }
 }
-
-fn example_plot() -> egui::plot::Plot {
-    use egui::plot::{Line, Plot, Value, Values};
+fn gaussian(x: f64) -> f64 {
+    let var: f64 = 2.0;
+    f64::exp(-0.5 * (x / var).powi(2)) / (var * f64::sqrt(std::f64::consts::TAU))
+}
+fn sigmoid(x: f64) -> f64 {
+    1.0 / (1.0 + f64::exp(-x))
+}
+fn example_plot(plot: &Plot) -> egui::plot::Plot {
+    use egui::plot::{Line, Value, Values};
     let n = 128;
     let line = Line::new(Values::from_values_iter((0..=n).map(|i| {
         use std::f64::consts::TAU;
-        let x = egui::remap(i as f64, 0.0..=(n as f64), -TAU..=TAU);
-        Value::new(x, x.sin())
+        let x = egui::remap(i as f64, 0.0..=n as f64, -TAU..=TAU);
+        match plot {
+            Plot::Sin => Value::new(x, x.sin()),
+            Plot::Bell => Value::new(x, 5.0 * gaussian(x)),
+            Plot::Sigmoid => Value::new(x, sigmoid(x)),
+        }
     })));
-    Plot::new("example_plot")
+    egui::plot::Plot::new("example_plot")
         .line(line)
         .height(32.0)
         .data_aspect(1.0)

@@ -70,6 +70,36 @@ pub fn menu<R>(
     menu_impl(ui, title, Box::new(add_contents))
 }
 
+pub(crate) fn menu_ui<'c, R>(
+    ctx: &CtxRef,
+    menu_id: Id,
+    pos: Pos2,
+    mut style: Style,
+    add_contents: impl FnOnce(&mut Ui) -> R + 'c,
+) -> InnerResponse<R> {
+    let area = Area::new(menu_id)
+        .order(Order::Foreground)
+        .fixed_pos(pos)
+        .drag_bounds(Rect::EVERYTHING);
+    let frame = Frame::menu(&style);
+
+    area.show(ctx, |ui| {
+        frame
+            .show(ui, |ui| {
+                style.spacing.button_padding = vec2(2.0, 0.0);
+                // style.visuals.widgets.active.bg_fill = Color32::TRANSPARENT;
+                style.visuals.widgets.active.bg_stroke = Stroke::none();
+                // style.visuals.widgets.hovered.bg_fill = Color32::TRANSPARENT;
+                style.visuals.widgets.hovered.bg_stroke = Stroke::none();
+                style.visuals.widgets.inactive.bg_fill = Color32::TRANSPARENT;
+                style.visuals.widgets.inactive.bg_stroke = Stroke::none();
+                ui.set_style(style);
+                ui.with_layout(Layout::top_down_justified(Align::LEFT), add_contents)
+                    .inner
+            })
+            .inner
+    })
+}
 #[allow(clippy::needless_pass_by_value)]
 fn menu_impl<'c, R>(
     ui: &mut Ui,
@@ -103,30 +133,14 @@ fn menu_impl<'c, R>(
 
     let inner = if bar_state.open_menu == Some(menu_id) || ui.ctx().memory().everything_is_visible()
     {
-        let area = Area::new(menu_id)
-            .order(Order::Foreground)
-            .fixed_pos(button_response.rect.left_bottom());
-        let frame = Frame::menu(ui.style());
-
-        let inner = area
-            .show(ui.ctx(), |ui| {
-                frame
-                    .show(ui, |ui| {
-                        let mut style = (**ui.style()).clone();
-                        style.spacing.button_padding = vec2(2.0, 0.0);
-                        // style.visuals.widgets.active.bg_fill = Color32::TRANSPARENT;
-                        style.visuals.widgets.active.bg_stroke = Stroke::none();
-                        // style.visuals.widgets.hovered.bg_fill = Color32::TRANSPARENT;
-                        style.visuals.widgets.hovered.bg_stroke = Stroke::none();
-                        style.visuals.widgets.inactive.bg_fill = Color32::TRANSPARENT;
-                        style.visuals.widgets.inactive.bg_stroke = Stroke::none();
-                        ui.set_style(style);
-                        ui.with_layout(Layout::top_down_justified(Align::LEFT), add_contents)
-                            .inner
-                    })
-                    .inner
-            })
-            .inner;
+        let inner = menu_ui(
+            ui.ctx(),
+            menu_id,
+            button_response.rect.left_bottom(),
+            ui.style().as_ref().clone(),
+            add_contents,
+        )
+        .inner;
 
         // TODO: this prevents sub-menus in menus. We should fix that.
         if ui.input().key_pressed(Key::Escape) || button_response.clicked_elsewhere() {

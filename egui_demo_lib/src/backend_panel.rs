@@ -103,6 +103,37 @@ impl BackendPanel {
         self.egui_windows.windows(ctx);
     }
 
+    pub fn context_menu(ui: &mut egui::Ui, menu_state: &mut egui::context_menu::MenuState) {
+        if ui.button("Open...").clicked() {
+            menu_state.close();
+        }
+        menu_state.submenu("SubMenu").show(ui, |ui, menu_state| {
+            menu_state.submenu("SubMenu").show(ui, |ui, menu_state| {
+                if ui.button("Open...").clicked() {
+                    menu_state.close();
+                }
+                let _ = ui.button("Item");
+            });
+            menu_state.submenu("SubMenu").show(ui, |ui, menu_state| {
+                if ui.button("Open...").clicked() {
+                    menu_state.close();
+                }
+                let _ = ui.button("Item");
+            });
+            let _ = ui.button("Item");
+            if ui.button("Open...").clicked() {
+                menu_state.close();
+            }
+        });
+        menu_state.submenu("SubMenu").show(ui, |ui, _menu_state| {
+            let _ = ui.button("Item1");
+            let _ = ui.button("Item2");
+            let _ = ui.button("Item3");
+            let _ = ui.button("Item4");
+        });
+        let _ = ui.button("Very long text for this item");
+    }
+
     pub fn ui(&mut self, ui: &mut egui::Ui, frame: &mut epi::Frame<'_>) {
         egui::trace!(ui);
         ui.vertical_centered(|ui| {

@@ -1,3 +1,4 @@
+use super::backend_panel::BackendPanel;
 /// All the different demo apps.
 #[derive(Default)]
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -32,7 +33,7 @@ impl Apps {
 pub struct WrapApp {
     selected_anchor: String,
     apps: Apps,
-    backend_panel: super::backend_panel::BackendPanel,
+    backend_panel: BackendPanel,
 }
 
 impl epi::App for WrapApp {
@@ -89,9 +90,12 @@ impl epi::App for WrapApp {
         self.backend_panel.update(ctx, frame);
 
         if self.backend_panel.open || ctx.memory().everything_is_visible() {
-            egui::SidePanel::left("backend_panel").show(ctx, |ui| {
-                self.backend_panel.ui(ui, frame);
-            });
+            egui::SidePanel::left("backend_panel")
+                .show(ctx, |ui| {
+                    self.backend_panel.ui(ui, frame);
+                })
+                .response
+                .context_menu(BackendPanel::context_menu);
         }
 
         for (anchor, app) in self.apps.iter_mut() {
@@ -141,6 +145,12 @@ impl WrapApp {
 
                 egui::warn_if_debug_build(ui);
             });
+        })
+        .response
+        .context_menu(|ui, _menu_state| {
+            if ui.button("Print something").clicked() {
+                println!("something");
+            }
         });
     }
 }

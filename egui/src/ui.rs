@@ -49,7 +49,7 @@ pub struct Ui {
     style: std::sync::Arc<Style>,
 
     /// Handles the `Ui` size and the placement of new widgets.
-    placer: Placer,
+    pub(crate) placer: Placer,
 
     /// If false we are unresponsive to input,
     /// and all widgets will assume a gray style.
