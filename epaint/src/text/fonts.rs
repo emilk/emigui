@@ -145,7 +145,10 @@ impl Default for FontDefinitions {
         #[cfg(feature = "default_fonts")]
         {
             // TODO: figure out a way to make the WASM smaller despite including fonts. Zip them?
-
+            //font_data.insert(
+            //    "ComicMono".to_owned(),
+            //    std::borrow::Cow::Borrowed(include_bytes!("../../fonts/ComicMono.ttf")),
+            //);
             // Use size 13 for this. NOTHING ELSE:
             font_data.insert(
                 "ProggyClean".to_owned(),
@@ -170,7 +173,7 @@ impl Default for FontDefinitions {
             fonts_for_family.insert(
                 FontFamily::Monospace,
                 vec![
-                    "ProggyClean".to_owned(),
+                    "ComicMono".to_owned(),
                     "Ubuntu-Light".to_owned(), // fallback for √ etc
                     "NotoEmoji-Regular".to_owned(),
                     "emoji-icon-font".to_owned(),

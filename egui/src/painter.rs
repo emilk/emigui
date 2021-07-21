@@ -5,7 +5,7 @@ use crate::{
 };
 use epaint::{
     mutex::Mutex,
-    text::{Fonts, Galley, TextStyle},
+    text::{Fonts, Galley, TextColorMap, TextStyle},
     Shape, Stroke,
 };
 
@@ -392,10 +392,28 @@ impl Painter {
             self.add(Shape::Text {
                 pos,
                 galley,
-                color,
+                default_color: color,
+                color_map: TextColorMap::default(),
                 fake_italics,
             });
         }
+    }
+
+    /// Paint text that has already been layed out in a `Galley`, with multiple colors
+    pub fn multicolor_galley(
+        &self,
+        pos: Pos2,
+        galley: std::sync::Arc<Galley>,
+        color_map: TextColorMap,
+        default_color: Color32,
+    ) {
+        self.add(Shape::Text {
+            pos,
+            galley,
+            color_map,
+            default_color,
+            fake_italics: false,
+        });
     }
 }
 
