@@ -377,34 +377,50 @@ pub const APP_KEY: &str = "app";
 ///
 /// You must enable the "http" feature for this.
 pub mod http {
-    /// A simple http requests.
+    use std::collections::BTreeMap;
+
+    /// A simple http request.
     pub struct Request {
         /// "GET", …
         pub method: String,
         /// https://…
         pub url: String,
-        /// x-www-form-urlencoded body
-        pub body: String,
+        /// The raw bytes.
+        pub body: Vec<u8>,
+        /// ("Accept", "*/*"), …
+        pub headers: BTreeMap<String, String>,
     }
 
     impl Request {
-        /// Create a `GET` requests with the given url.
+        pub fn create_headers_map(headers: &[(&str, &str)]) -> BTreeMap<String, String> {
+            headers
+                .iter()
+                .map(|e| (e.0.to_owned(), e.1.to_owned()))
+                .collect()
+        }
+
+        /// Create a `GET` request with the given url.
         #[allow(clippy::needless_pass_by_value)]
         pub fn get(url: impl ToString) -> Self {
             Self {
                 method: "GET".to_owned(),
                 url: url.to_string(),
-                body: "".to_string(),
+                body: vec![],
+                headers: Request::create_headers_map(&[("Accept", "*/*")]),
             }
         }
 
-        /// Create a `POST` requests with the give url and body.
+        /// Create a `POST` request with the given url and body.
         #[allow(clippy::needless_pass_by_value)]
         pub fn post(url: impl ToString, body: impl ToString) -> Self {
             Self {
                 method: "POST".to_owned(),
                 url: url.to_string(),
-                body: body.to_string(),
+                body: body.to_string().into_bytes(),
+                headers: Request::create_headers_map(&[
+                    ("Accept", "*/*"),
+                    ("Content-Type", "text/plain; charset=utf-8"),
+                ]),
             }
         }
     }
@@ -419,18 +435,21 @@ pub mod http {
         pub status: u16,
         /// Status text (e.g. "File not found" for status code `404`).
         pub status_text: String,
-
-        /// Content-Type header, or empty string if missing.
-        pub header_content_type: String,
-
         /// The raw bytes.
         pub bytes: Vec<u8>,
 
-        /// UTF-8 decoded version of bytes.
-        /// ONLY if `header_content_type` starts with "text" and bytes is UTF-8.
-        pub text: Option<String>,
+        pub headers: BTreeMap<String, String>,
     }
 
+    impl Response {
+        pub fn text(&self) -> Option<String> {
+            String::from_utf8(self.bytes.clone()).ok()
+        }
+
+        pub fn content_type(&self) -> Option<String> {
+            self.headers.get("content-type").cloned()
+        }
+    }
     /// Possible errors does NOT include e.g. 404, which is NOT considered an error.
     pub type Error = String;
 }

@@ -1,9 +1,11 @@
-use epi::http::Response;
+use epi::http::{Request, Response};
 use std::sync::mpsc::Receiver;
 
 struct Resource {
     /// HTTP response
     response: Response,
+
+    text: Option<String>,
 
     /// If set, the response was an image.
     image: Option<Image>,
@@ -14,25 +16,42 @@ struct Resource {
 
 impl Resource {
     fn from_response(response: Response) -> Self {
-        let image = if response.header_content_type.starts_with("image/") {
+        let content_type = response.content_type().unwrap_or_default();
+        let image = if content_type.starts_with("image/") {
             Image::decode(&response.bytes)
         } else {
             None
         };
 
-        let colored_text = syntax_highlighting(&response);
+        let text = response.text();
+
+        let colored_text = text
+            .as_ref()
+            .and_then(|text| syntax_highlighting(&response, text));
 
         Self {
             response,
+            text,
             image,
             colored_text,
         }
     }
 }
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
+enum Method {
+    Get,
+    Post,
+}
+
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 pub struct HttpApp {
     url: String,
+
+    method: Method,
+
+    request_body: String,
 
     #[cfg_attr(feature = "persistence", serde(skip))]
     in_progress: Option<Receiver<Result<Response, String>>>,
@@ -48,6 +67,8 @@ impl Default for HttpApp {
     fn default() -> Self {
         Self {
             url: "https://raw.githubusercontent.com/emilk/egui/master/README.md".to_owned(),
+            method: Method::Get,
+            request_body: r#"["posting some json", { "more_json" : true }]"#.to_owned(),
             in_progress: Default::default(),
             result: Default::default(),
             tex_mngr: Default::default(),
@@ -78,12 +99,18 @@ impl epi::App for HttpApp {
                 "(source code)"
             ));
 
-            if let Some(url) = ui_url(ui, frame, &mut self.url) {
+            if let Some(request) = ui_url(
+                ui,
+                frame,
+                &mut self.url,
+                &mut self.method,
+                &mut self.request_body,
+            ) {
                 let repaint_signal = frame.repaint_signal();
                 let (sender, receiver) = std::sync::mpsc::channel();
                 self.in_progress = Some(receiver);
 
-                frame.http_fetch(epi::http::Request::get(url), move |response| {
+                frame.http_fetch(request, move |response| {
                     sender.send(response).ok();
                     repaint_signal.request_repaint();
                 });
@@ -100,7 +127,10 @@ impl epi::App for HttpApp {
                     }
                     Err(error) => {
                         // This should only happen if the fetch API isn't available or something similar.
-                        ui.add(egui::Label::new(error).text_color(egui::Color32::RED));
+                        ui.add(
+                            egui::Label::new(if error.is_empty() { "Error" } else { error })
+                                .text_color(egui::Color32::RED),
+                        );
                     }
                 }
             }
@@ -108,13 +138,38 @@ impl epi::App for HttpApp {
     }
 }
 
-fn ui_url(ui: &mut egui::Ui, frame: &mut epi::Frame<'_>, url: &mut String) -> Option<String> {
+fn ui_url(
+    ui: &mut egui::Ui,
+    frame: &mut epi::Frame<'_>,
+    url: &mut String,
+    method: &mut Method,
+    request_body: &mut String,
+) -> Option<Request> {
     let mut trigger_fetch = false;
 
-    ui.horizontal(|ui| {
+    egui::Grid::new("request_params").show(ui, |ui| {
         ui.label("URL:");
-        trigger_fetch |= ui.text_edit_singleline(url).lost_focus();
-        trigger_fetch |= ui.button("GET").clicked();
+        ui.horizontal(|ui| {
+            trigger_fetch |= ui.text_edit_singleline(url).lost_focus();
+            egui::ComboBox::from_id_source("method")
+                .selected_text(format!("{:?}", method))
+                .width(60.0)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(method, Method::Get, "GET");
+                    ui.selectable_value(method, Method::Post, "POST");
+                });
+            trigger_fetch |= ui.button("▶").clicked();
+        });
+        ui.end_row();
+        if *method == Method::Post {
+            ui.label("Body:");
+            ui.add(
+                egui::TextEdit::multiline(request_body)
+                    .code_editor()
+                    .desired_rows(1),
+            );
+            ui.end_row();
+        }
     });
 
     if frame.is_web() {
@@ -127,6 +182,7 @@ fn ui_url(ui: &mut egui::Ui, frame: &mut epi::Frame<'_>, url: &mut String) -> Op
                 "https://raw.githubusercontent.com/emilk/egui/master/{}",
                 file!()
             );
+            *method = Method::Get;
             trigger_fetch = true;
         }
         if ui.button("Random image").clicked() {
@@ -134,12 +190,21 @@ fn ui_url(ui: &mut egui::Ui, frame: &mut epi::Frame<'_>, url: &mut String) -> Op
             let width = 640;
             let height = 480;
             *url = format!("https://picsum.photos/seed/{}/{}/{}", seed, width, height);
+            *method = Method::Get;
+            trigger_fetch = true;
+        }
+        if ui.button("Post to httpbin.org").clicked() {
+            *url = "https://httpbin.org/post".to_owned();
+            *method = Method::Post;
             trigger_fetch = true;
         }
     });
 
     if trigger_fetch {
-        Some(url.clone())
+        Some(match *method {
+            Method::Get => Request::get(url),
+            Method::Post => Request::post(url, request_body),
+        })
     } else {
         None
     }
@@ -153,6 +218,7 @@ fn ui_resource(
 ) {
     let Resource {
         response,
+        text,
         image,
         colored_text,
     } = resource;
@@ -162,13 +228,34 @@ fn ui_resource(
         "status:       {} ({})",
         response.status, response.status_text
     ));
-    ui.monospace(format!("Content-Type: {}", response.header_content_type));
     ui.monospace(format!(
-        "Size:         {:.1} kB",
+        "content-type: {}",
+        response.content_type().unwrap_or_default()
+    ));
+    ui.monospace(format!(
+        "size:         {:.1} kB",
         response.bytes.len() as f32 / 1000.0
     ));
 
-    if let Some(text) = &response.text {
+    ui.separator();
+
+    egui::CollapsingHeader::new("Response headers")
+        .default_open(false)
+        .show(ui, |ui| {
+            egui::Grid::new("response_headers")
+                .spacing(egui::vec2(ui.spacing().item_spacing.x * 2.0, 0.0))
+                .show(ui, |ui| {
+                    for header in &response.headers {
+                        ui.label(header.0);
+                        ui.label(header.1);
+                        ui.end_row();
+                    }
+                })
+        });
+
+    ui.separator();
+
+    if let Some(text) = &text {
         let tooltip = "Click to copy the response body";
         if ui.button("📋").on_hover_text(tooltip).clicked() {
             ui.output().copied_text = text.clone();
@@ -185,7 +272,7 @@ fn ui_resource(
             }
         } else if let Some(colored_text) = colored_text {
             colored_text.ui(ui);
-        } else if let Some(text) = &response.text {
+        } else if let Some(text) = &text {
             ui.monospace(text);
         } else {
             ui.monospace("[binary]");
@@ -197,8 +284,7 @@ fn ui_resource(
 // Syntax highlighting:
 
 #[cfg(feature = "syntect")]
-fn syntax_highlighting(response: &Response) -> Option<ColoredText> {
-    let text = response.text.as_ref()?;
+fn syntax_highlighting(response: &Response, text: &str) -> Option<ColoredText> {
     let extension_and_rest: Vec<&str> = response.url.rsplitn(2, '.').collect();
     let extension = extension_and_rest.get(0)?;
     ColoredText::text_with_extension(text, extension)
@@ -253,7 +339,7 @@ impl ColoredText {
 }
 
 #[cfg(not(feature = "syntect"))]
-fn syntax_highlighting(_: &Response) -> Option<ColoredText> {
+fn syntax_highlighting(_: &Response, _: &str) -> Option<ColoredText> {
     None
 }
 #[cfg(not(feature = "syntect"))]

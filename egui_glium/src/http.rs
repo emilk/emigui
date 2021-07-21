@@ -1,16 +1,20 @@
+use std::collections::BTreeMap;
+
 pub use epi::http::{Request, Response};
 
 /// NOTE: Ok(..) is returned on network error.
 /// Err is only for failure to use the fetch api.
 pub fn fetch_blocking(request: &Request) -> Result<Response, String> {
-    let Request { method, url, body } = request;
+    let mut req = ureq::request(&request.method, &request.url);
 
-    let req = ureq::request(method, url).set("Accept", "*/*");
-    let resp = if body.is_empty() {
+    for header in &request.headers {
+        req = req.set(header.0, header.1);
+    }
+
+    let resp = if request.body.is_empty() {
         req.call()
     } else {
-        req.set("Content-Type", "text/plain; charset=utf-8")
-            .send_string(body)
+        req.send_bytes(&request.body)
     };
 
     let (ok, resp) = match resp {
@@ -22,7 +26,13 @@ pub fn fetch_blocking(request: &Request) -> Result<Response, String> {
     let url = resp.get_url().to_owned();
     let status = resp.status();
     let status_text = resp.status_text().to_owned();
-    let header_content_type = resp.header("Content-Type").unwrap_or_default().to_owned();
+    let mut headers = BTreeMap::new();
+    for key in &resp.headers_names() {
+        if let Some(value) = resp.header(key) {
+            // lowercase for easy lookup
+            headers.insert(key.to_ascii_lowercase(), value.to_owned());
+        }
+    }
 
     let mut reader = resp.into_reader();
     let mut bytes = vec![];
@@ -31,22 +41,13 @@ pub fn fetch_blocking(request: &Request) -> Result<Response, String> {
         .read_to_end(&mut bytes)
         .map_err(|err| err.to_string())?;
 
-    let text = if header_content_type.starts_with("text")
-        || header_content_type == "application/javascript"
-    {
-        String::from_utf8(bytes.clone()).ok()
-    } else {
-        None
-    };
-
     let response = Response {
         url,
         ok,
         status,
         status_text,
-        header_content_type,
         bytes,
-        text,
+        headers,
     };
     Ok(response)
 }
