@@ -305,7 +305,7 @@ The _frame_ in `eframe` stands both for the frame in which your egui app resides
 On Linux and Mac, Firefox will copy the WebGL render target from GPU, to CPU and then back again: https://bugzilla.mozilla.org/show_bug.cgi?id=1010527#c0
 
 ### Why does my web app not fill the full width of the screen?
-To alleviate the above mentioned performance issues the default max-width of an egui web app is 1024 points. You can change this by ovveriding the `fn max_size_points` of `epi::App`.
+To alleviate the above mentioned performance issues the default max-width of an egui web app is 1024 points. You can change this by overriding the `fn max_size_points` of `epi::App`.
 
 
 ## Other
