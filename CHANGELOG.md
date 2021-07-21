@@ -19,6 +19,7 @@ NOTE: [`eframe`](eframe/CHANGELOG.md), [`egui_web`](egui_web/CHANGELOG.md) and [
   * [Line styles](https://github.com/emilk/egui/pull/482)
 * [Progress bar](https://github.com/emilk/egui/pull/519)
 * `Grid::num_columns`: allow the last column to take up the rest of the space of the parent `Ui`.
+* Add `show_background` and `show_axes` methods to `Plot`.
 
 ### Fixed 🐛
 * Fix custom font definitions getting replaced when `pixels_per_point` is changed.
