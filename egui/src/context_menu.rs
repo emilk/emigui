@@ -159,7 +159,7 @@ impl MenuState {
     pub fn close(&mut self) {
         self.response = MenuResponse::Close;
     }
-    /// show a sub-menu
+    /// create a sub-menu
     pub fn submenu(&'_ mut self, text: impl ToString) -> SubMenu<'_> {
         SubMenu::new(text, self)
     }
