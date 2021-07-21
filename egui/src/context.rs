@@ -7,12 +7,12 @@ use std::sync::{
 
 use crate::{
     animation_manager::AnimationManager,
+    context_menu::{ContextMenuSystem, MenuState},
     data::output::Output,
     frame_state::FrameState,
     input_state::*,
     layers::GraphicLayers,
     mutex::{Mutex, MutexGuard},
-    context_menu::{ ContextMenuSystem, MenuState },
     *,
 };
 use epaint::{stats::*, text::Fonts, *};
@@ -303,8 +303,13 @@ impl CtxRef {
         Self::layer_painter(self, LayerId::debug())
     }
 
-    pub(crate) fn show_context_menu(&self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState))  {
-        self.context_menu_system().context_menu(response, add_contents)
+    pub(crate) fn show_context_menu(
+        &self,
+        response: &Response,
+        add_contents: impl FnOnce(&mut Ui, &mut MenuState),
+    ) {
+        self.context_menu_system()
+            .context_menu(response, add_contents)
     }
 }
 
@@ -335,7 +340,6 @@ pub struct Context {
     context_menu_system: Arc<Mutex<ContextMenuSystem>>,
 
     input: InputState,
-
 
     /// State that is collected during a frame and then cleared
     frame_state: Arc<Mutex<FrameState>>,

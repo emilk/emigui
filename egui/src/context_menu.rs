@@ -1,12 +1,6 @@
 use super::{
-    Id, Rect, Ui,
-    Response, CtxRef,
-    Pos2, Sense, Vec2,
-    PointerState,
-    Style, TextStyle,
-    style::Spacing,
-    Frame, Label,
-    Layout,
+    style::Spacing, CtxRef, Frame, Id, Label, Layout, PointerState, Pos2, Rect, Response, Sense,
+    Style, TextStyle, Ui, Vec2,
 };
 
 #[derive(Default)]
@@ -38,7 +32,11 @@ impl ContextMenuSystem {
         MenuResponse::Stay
     }
     /// show the current context menu
-    fn show(&mut self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> MenuResponse {
+    fn show(
+        &mut self,
+        response: &Response,
+        add_contents: impl FnOnce(&mut Ui, &mut MenuState),
+    ) -> MenuResponse {
         if let Some(context_menu) = &mut self.context_menu {
             if context_menu.ui_id == response.id {
                 let response = context_menu.show(&response.ctx, response.id, add_contents);
@@ -52,14 +50,16 @@ impl ContextMenuSystem {
         MenuResponse::Stay
     }
     /// should be called from Context on a Response
-    pub fn context_menu(&mut self, response: &Response, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) {
+    pub fn context_menu(
+        &mut self,
+        response: &Response,
+        add_contents: impl FnOnce(&mut Ui, &mut MenuState),
+    ) {
         match self.sense_click(response) {
             MenuResponse::Create(pos) => {
                 self.context_menu = Some(ContextMenuRoot::new(pos, response.id));
-            },
-            MenuResponse::Close => {
-                self.context_menu = None
-            },
+            }
+            MenuResponse::Close => self.context_menu = None,
             MenuResponse::Stay => {}
         };
         if let MenuResponse::Close = self.show(response, add_contents) {
@@ -130,8 +130,9 @@ impl<'a> SubMenu<'a> {
             label = label.text_color(ui.visuals().widgets.hovered.fg_stroke.color);
             frame = frame.fill(ui.visuals().widgets.hovered.bg_fill);
         }
-        let padding = ui.spacing().button_padding.x; 
-        let button = frame.show(ui, |ui| {
+        let padding = ui.spacing().button_padding.x;
+        let button = frame
+            .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.with_layout(Layout::left_to_right(), |ui| {
                         ui.add_space(padding);
@@ -144,8 +145,11 @@ impl<'a> SubMenu<'a> {
                 });
             })
             .response;
-        self.parent_state.submenu_button_interaction(ui, sub_id, &button);
-        self.parent_state.show_submenu(ui.ctx(), sub_id, add_contents).unwrap_or(button)
+        self.parent_state
+            .submenu_button_interaction(ui, sub_id, &button);
+        self.parent_state
+            .show_submenu(ui.ctx(), sub_id, add_contents)
+            .unwrap_or(button)
     }
 }
 
@@ -167,7 +171,7 @@ impl MenuState {
         Self {
             rect: Rect::from_min_size(position, Vec2::ZERO),
             sub_menu: None,
-            response: MenuResponse::Stay
+            response: MenuResponse::Stay,
         }
     }
     /// sense button interaction opening and closing submenu
@@ -184,17 +188,26 @@ impl MenuState {
             self.close_submenu();
         }
     }
-    fn show_submenu(&mut self, ctx: &CtxRef, id: Id, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Option<Response> {
-        let (sub_response, response) = self.get_submenu(id)
-            .map(|sub| {
-                let response = sub.show(ctx, id, add_contents);
-                sub.rect = response.rect;
-                (sub.response.clone(), response)
-            })?;
+    fn show_submenu(
+        &mut self,
+        ctx: &CtxRef,
+        id: Id,
+        add_contents: impl FnOnce(&mut Ui, &mut MenuState),
+    ) -> Option<Response> {
+        let (sub_response, response) = self.get_submenu(id).map(|sub| {
+            let response = sub.show(ctx, id, add_contents);
+            sub.rect = response.rect;
+            (sub.response.clone(), response)
+        })?;
         self.cascade_response(sub_response);
         Some(response)
     }
-    fn show(&mut self, ctx: &CtxRef, id: Id, add_contents: impl FnOnce(&mut Ui, &mut MenuState)) -> Response {
+    fn show(
+        &mut self,
+        ctx: &CtxRef,
+        id: Id,
+        add_contents: impl FnOnce(&mut Ui, &mut MenuState),
+    ) -> Response {
         crate::menu::menu_ui(
             ctx,
             id,
@@ -209,14 +222,16 @@ impl MenuState {
             |ui| {
                 ui.set_width(100.0);
                 add_contents(ui, self)
-            }
+            },
         )
         .response
     }
     /// check if position is in the menu hierarchy's area
-    fn area_contains(&self, pos: Pos2) -> bool{
-        self.rect.contains(pos) ||
-            self.sub_menu.as_ref()
+    fn area_contains(&self, pos: Pos2) -> bool {
+        self.rect.contains(pos)
+            || self
+                .sub_menu
+                .as_ref()
                 .map(|(_, sub)| sub.area_contains(pos))
                 .unwrap_or(false)
     }
@@ -228,8 +243,10 @@ impl MenuState {
         bottom_a - vel_a >= 0.0 && top_a - vel_a <= 0.0
     }
     /// check if pointer is moving towards current submenu
-    fn moving_towards_current_submenu(&self, pointer: &PointerState) -> bool{
-        if pointer.is_still() { return false; }
+    fn moving_towards_current_submenu(&self, pointer: &PointerState) -> bool {
+        if pointer.is_still() {
+            return false;
+        }
         if let Some(sub_menu) = self.get_current_submenu() {
             if let Some(pos) = pointer.hover_pos() {
                 return Self::points_at_left_of_rect(pos, pointer.velocity(), sub_menu.rect);
@@ -238,7 +255,7 @@ impl MenuState {
         false
     }
     /// check if pointer is hovering current submenu
-    fn hovering_current_submenu(&self, pointer: &PointerState) -> bool{
+    fn hovering_current_submenu(&self, pointer: &PointerState) -> bool {
         if let Some(sub_menu) = self.get_current_submenu() {
             if let Some(pos) = pointer.hover_pos() {
                 return sub_menu.area_contains(pos);
@@ -262,11 +279,9 @@ impl MenuState {
         self.sub_menu.as_ref().map(|(_, sub)| sub.as_ref())
     }
     fn get_submenu(&mut self, id: Id) -> Option<&mut MenuState> {
-        self.sub_menu.as_mut().and_then(|(k, sub)| if id == *k {
-            Some(sub.as_mut())
-        } else {
-            None
-        })
+        self.sub_menu
+            .as_mut()
+            .and_then(|(k, sub)| if id == *k { Some(sub.as_mut()) } else { None })
     }
     /// open submenu at position, if not already open
     fn open_submenu(&mut self, id: Id, pos: Pos2) {

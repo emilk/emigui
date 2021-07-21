@@ -88,7 +88,8 @@ impl Default for DragAndDropDemo {
                 vec!["Item A", "Item B", "Item C"],
                 vec!["Item D", "Item E"],
                 vec!["Item F", "Item G", "Item H"],
-            ].into_iter()
+            ]
+            .into_iter()
             .map(|v| v.into_iter().map(ToString::to_string).collect())
             .collect(),
         }
@@ -127,13 +128,14 @@ impl super::View for DragAndDropDemo {
                     for (row_idx, item) in column.iter().enumerate() {
                         let item_id = Id::new("item").with(col_idx).with(row_idx);
                         drag_source(ui, item_id, |ui| {
-                            ui.add(Label::new(item).sense(Sense::click()))
-                                .context_menu(|ui, menu_state| {
+                            ui.add(Label::new(item).sense(Sense::click())).context_menu(
+                                |ui, menu_state| {
                                     if ui.button("Remove...").clicked() {
                                         self.columns[col_idx].remove(row_idx);
                                         menu_state.close();
                                     }
-                                });
+                                },
+                            );
                         });
 
                         if ui.memory().is_being_dragged(item_id) {

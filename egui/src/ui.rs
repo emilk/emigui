@@ -325,7 +325,6 @@ impl Ui {
     pub fn set_clip_rect(&mut self, clip_rect: Rect) {
         self.painter.set_clip_rect(clip_rect);
     }
-
 }
 
 // ------------------------------------------------------------------------

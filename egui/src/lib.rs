@@ -323,6 +323,7 @@ mod animation_manager;
 pub mod any;
 pub mod containers;
 mod context;
+pub mod context_menu;
 mod data;
 mod frame_state;
 pub(crate) mod grid;
@@ -341,7 +342,6 @@ pub mod style;
 mod ui;
 pub mod util;
 pub mod widgets;
-pub mod context_menu;
 
 pub use epaint;
 pub use epaint::emath;

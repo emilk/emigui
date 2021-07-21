@@ -223,19 +223,18 @@ impl WidgetGallery {
         ui.end_row();
 
         ui.add(doc_link_label("Plot", "plot"));
-        ui.add(example_plot(plot))
-            .context_menu(|ui, menu_state| {
-                if ui.button("Sin").clicked() {
-                    *plot = Plot::Sin;
-                    menu_state.close();
-                } else if ui.button("Bell").clicked() {
-                    *plot = Plot::Bell;
-                    menu_state.close();
-                } else if ui.button("Sigmoid").clicked() {
-                    *plot = Plot::Sigmoid;
-                    menu_state.close();
-                }
-            });
+        ui.add(example_plot(plot)).context_menu(|ui, menu_state| {
+            if ui.button("Sin").clicked() {
+                *plot = Plot::Sin;
+                menu_state.close();
+            } else if ui.button("Bell").clicked() {
+                *plot = Plot::Bell;
+                menu_state.close();
+            } else if ui.button("Sigmoid").clicked() {
+                *plot = Plot::Sigmoid;
+                menu_state.close();
+            }
+        });
 
         ui.end_row();
 
@@ -252,10 +251,10 @@ impl WidgetGallery {
 }
 fn gaussian(x: f64) -> f64 {
     let var: f64 = 2.0;
-    f64::exp(-0.5*(x/var).powi(2))/(var*f64::sqrt(std::f64::consts::TAU))
+    f64::exp(-0.5 * (x / var).powi(2)) / (var * f64::sqrt(std::f64::consts::TAU))
 }
 fn sigmoid(x: f64) -> f64 {
-    1.0/(1.0 + f64::exp(-x))
+    1.0 / (1.0 + f64::exp(-x))
 }
 fn example_plot(plot: &Plot) -> egui::plot::Plot {
     use egui::plot::{Line, Value, Values};
@@ -265,7 +264,7 @@ fn example_plot(plot: &Plot) -> egui::plot::Plot {
         let x = egui::remap(i as f64, 0.0..=n as f64, -TAU..=TAU);
         match plot {
             Plot::Sin => Value::new(x, x.sin()),
-            Plot::Bell => Value::new(x, 5.0*gaussian(x)),
+            Plot::Bell => Value::new(x, 5.0 * gaussian(x)),
             Plot::Sigmoid => Value::new(x, sigmoid(x)),
         }
     })));
@@ -274,7 +273,6 @@ fn example_plot(plot: &Plot) -> egui::plot::Plot {
         .height(32.0)
         .data_aspect(1.0)
 }
-
 
 fn doc_link_label<'a>(title: &'a str, search_term: &'a str) -> impl egui::Widget + 'a {
     let label = format!("{}:", title);
