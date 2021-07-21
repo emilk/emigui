@@ -208,10 +208,15 @@ pub fn input_to_egui(
                     vec2(delta.x as f32, delta.y as f32) / pixels_per_point
                 }
             };
+
+            // Various hacks for https://github.com/emilk/egui/issues/356
             if cfg!(target_os = "macos") {
                 // This is still buggy in winit despite
                 // https://github.com/rust-windowing/winit/issues/1695 being closed
                 delta.x *= -1.0;
+            }
+            if cfg!(target_os = "linux") {
+                delta.y *= -1.0;
             }
 
             if input_state.raw.modifiers.ctrl || input_state.raw.modifiers.command {
